@@ -363,22 +363,5 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 ---
 
-## 📞 Contact
-
-- **Project Lead:** [Your Name]
-- **Email:** contact@pragaticonnect.in
-- **Website:** https://pragaticonnect.in
-- **Support:** WhatsApp +91-XXXXXXXXXX
-
----
-
-## 📚 Documentation
-
-- [Requirements Document](.kiro/specs/pragati-connect/requirements.md)
-- [Design Document](.kiro/specs/pragati-connect/design.md)
-- [API Documentation](docs/api.md)
-- [Deployment Guide](docs/deployment.md)
-
----
 
 **Built with ❤️ for India's backbone workforce**
