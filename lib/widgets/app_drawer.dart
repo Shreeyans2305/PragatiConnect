@@ -1,12 +1,19 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants.dart';
 import '../l10n/app_strings.dart';
+import '../providers/user_profile_provider.dart';
 
 class AppDrawer extends StatelessWidget {
   final int currentIndex;
+  final UserProfileProvider? profileProvider;
 
-  const AppDrawer({super.key, required this.currentIndex});
+  const AppDrawer({
+    super.key,
+    required this.currentIndex,
+    this.profileProvider,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,36 +36,87 @@ class AppDrawer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [primaryColor, AppColors.secondary],
+            // Header — Profile avatar + name (tappable)
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                Navigator.pop(context); // close drawer
+                Navigator.pushNamed(context, '/profile');
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [primaryColor, AppColors.secondary],
+                        ),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.1)
+                              : Colors.grey.shade300,
+                          width: 1.5,
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(10),
+                      child: ClipOval(
+                        child: (profileProvider?.hasProfileImage ?? false)
+                            ? Image.file(
+                                File(profileProvider!.profileImagePath),
+                                fit: BoxFit.cover,
+                                width: 44,
+                                height: 44,
+                              )
+                            : Icon(
+                                Icons.person_rounded,
+                                color: Colors.white.withValues(alpha: 0.9),
+                                size: 24,
+                              ),
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.bolt,
-                      color: Colors.white,
-                      size: 22,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            profileProvider?.displayName ?? s.get('app_name'),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: textColor,
+                              fontSize: 17,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if ((profileProvider?.occupation ?? '')
+                              .isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              profileProvider!.occupation,
+                              style: TextStyle(
+                                color: subtitleColor,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    s.get('app_name'),
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: textColor,
-                      fontSize: 20,
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.3)
+                          : Colors.grey.shade400,
+                      size: 20,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             Padding(

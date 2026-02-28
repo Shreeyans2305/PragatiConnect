@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants.dart';
 import '../l10n/app_strings.dart';
 import '../services/gemini_service.dart';
 import '../widgets/app_drawer.dart';
+import '../providers/user_profile_provider.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final UserProfileProvider profileProvider;
+  const DashboardScreen({super.key, required this.profileProvider});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -18,6 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userName = widget.profileProvider.displayName;
 
     return PopScope(
       canPop: true,
@@ -34,98 +38,247 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
-        drawer: const AppDrawer(currentIndex: 0),
-        body: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppPadding.screenHorizontal,
-            vertical: AppPadding.screenVertical,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Section
-              _FadeSlideIn(
-                delay: 0,
-                child: Text(
-                  s.get('welcome_back'),
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+        drawer: AppDrawer(
+          currentIndex: 0,
+          profileProvider: widget.profileProvider,
+        ),
+        body: Stack(
+          children: [
+            // ─── Subtle Indian accent background ───────────────
+            Positioned.fill(
+              child: CustomPaint(painter: _IndianAccentPainter(isDark: isDark)),
+            ),
+            // ─── Main scrollable content ──────────────────────
+            SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppPadding.screenHorizontal,
+                vertical: AppPadding.screenVertical,
               ),
-              const SizedBox(height: 8),
-              _FadeSlideIn(delay: 50, child: _HeroText(s: s)),
-              const SizedBox(height: 28),
-
-              // ─── Sliding Scheme Banner ─────────────────────
-              _FadeSlideIn(delay: 150, child: const _SchemeBannerCarousel()),
-              const SizedBox(height: 16),
-
-              // AI Chatbot Card
-              _FadeSlideIn(
-                delay: 200,
-                child: _PressableCard(
-                  onTap: () => Navigator.pushNamed(context, '/ai-chat'),
-                  child: _FeatureCardContent(
-                    icon: Icons.smart_toy_rounded,
-                    iconColor: Colors.deepPurple,
-                    iconBgColor: isDark
-                        ? Colors.deepPurple.withValues(alpha: 0.15)
-                        : const Color(0xFFEDE7F6),
-                    title: s.get('ai_chatbot'),
-                    description: s.get('ai_chatbot_desc'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome Section
+                  _FadeSlideIn(
+                    delay: 0,
+                    child: Text(
+                      '${s.get('welcome_back')}, $userName',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  _FadeSlideIn(delay: 50, child: _HeroText(s: s)),
+                  const SizedBox(height: 28),
 
-              // Voice Assistant Card
-              _FadeSlideIn(
-                delay: 250,
-                child: _PressableCard(
-                  onTap: () => Navigator.pushNamed(context, '/voice-assistant'),
-                  child: _FeatureCardContent(
-                    icon: Icons.mic_rounded,
-                    iconColor: Colors.blue,
-                    iconBgColor: isDark
-                        ? Colors.blue.withValues(alpha: 0.15)
-                        : const Color(0xFFE3F2FD),
-                    title: s.get('voice_assistant'),
-                    description: s.get('voice_assistant_desc'),
+                  // ─── Sliding Scheme Banner ─────────────────────
+                  _FadeSlideIn(
+                    delay: 150,
+                    child: const _SchemeBannerCarousel(),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-              // Business Boost Card
-              _FadeSlideIn(
-                delay: 350,
-                child: _PressableCard(
-                  onTap: () => Navigator.pushNamed(context, '/business-boost'),
-                  child: _FeatureCardContent(
-                    icon: Icons.store_rounded,
-                    iconColor: AppColors.orange,
-                    iconBgColor: isDark
-                        ? AppColors.orange.withValues(alpha: 0.15)
-                        : const Color(0xFFFEF3E7),
-                    title: s.get('business_boost'),
-                    description: s.get('business_boost_desc'),
+                  // AI Chatbot Card
+                  _FadeSlideIn(
+                    delay: 200,
+                    child: _PressableCard(
+                      onTap: () => Navigator.pushNamed(context, '/ai-chat'),
+                      child: _FeatureCardContent(
+                        icon: Icons.smart_toy_rounded,
+                        iconColor: Colors.deepPurple,
+                        iconBgColor: isDark
+                            ? Colors.deepPurple.withValues(alpha: 0.15)
+                            : const Color(0xFFEDE7F6),
+                        title: s.get('ai_chatbot'),
+                        description: s.get('ai_chatbot_desc'),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-              // Impact Metrics Card
-              _FadeSlideIn(delay: 450, child: _ImpactMetricsCard(s: s)),
-              const SizedBox(height: 24),
-            ],
-          ),
+                  // Voice Assistant Card
+                  _FadeSlideIn(
+                    delay: 250,
+                    child: _PressableCard(
+                      onTap: () =>
+                          Navigator.pushNamed(context, '/voice-assistant'),
+                      child: _FeatureCardContent(
+                        icon: Icons.mic_rounded,
+                        iconColor: Colors.blue,
+                        iconBgColor: isDark
+                            ? Colors.blue.withValues(alpha: 0.15)
+                            : const Color(0xFFE3F2FD),
+                        title: s.get('voice_assistant'),
+                        description: s.get('voice_assistant_desc'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Business Boost Card
+                  _FadeSlideIn(
+                    delay: 350,
+                    child: _PressableCard(
+                      onTap: () =>
+                          Navigator.pushNamed(context, '/business-boost'),
+                      child: _FeatureCardContent(
+                        icon: Icons.store_rounded,
+                        iconColor: AppColors.orange,
+                        iconBgColor: isDark
+                            ? AppColors.orange.withValues(alpha: 0.15)
+                            : const Color(0xFFFEF3E7),
+                        title: s.get('business_boost'),
+                        description: s.get('business_boost_desc'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Impact Metrics Card
+                  _FadeSlideIn(delay: 450, child: _ImpactMetricsCard(s: s)),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+// ─── Subtle Indian-inspired background accent (Apple style) ──────────────────
+
+class _IndianAccentPainter extends CustomPainter {
+  final bool isDark;
+  const _IndianAccentPainter({required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Apple philosophy: decoration should be felt, not seen.
+    // Ultra-subtle rangoli/mandala-inspired concentric petal patterns.
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6;
+
+    // ─── Top-right mandala accent ───────────────────────────────────
+    _drawMandala(
+      canvas,
+      Offset(size.width * 0.88, size.height * 0.06),
+      radius: size.width * 0.28,
+      petals: 12,
+      paint: paint,
+      alpha: isDark ? 0.035 : 0.045,
+      rings: 3,
+    );
+
+    // ─── Bottom-left smaller accent ────────────────────────────────
+    _drawMandala(
+      canvas,
+      Offset(size.width * 0.08, size.height * 0.75),
+      radius: size.width * 0.22,
+      petals: 8,
+      paint: paint,
+      alpha: isDark ? 0.025 : 0.035,
+      rings: 2,
+    );
+
+    // ─── Subtle warm gradient wash (saffron/teal tint) ─────────────
+    final gradientPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.7, -0.3),
+        radius: 1.2,
+        colors: isDark
+            ? [
+                const Color(0xFFE8A838).withValues(alpha: 0.02),
+                Colors.transparent,
+              ]
+            : [
+                const Color(0xFFF97316).withValues(alpha: 0.025),
+                Colors.transparent,
+              ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      gradientPaint,
+    );
+
+    // ─── Second gradient — subtle teal on bottom ───────────────────
+    final tealPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.5, 0.8),
+        radius: 1.0,
+        colors: isDark
+            ? [
+                const Color(0xFF6AAFD4).withValues(alpha: 0.015),
+                Colors.transparent,
+              ]
+            : [
+                const Color(0xFF355872).withValues(alpha: 0.02),
+                Colors.transparent,
+              ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), tealPaint);
+  }
+
+  /// Draws a simplified mandala: concentric rings of petal-like arcs.
+  void _drawMandala(
+    Canvas canvas,
+    Offset center, {
+    required double radius,
+    required int petals,
+    required Paint paint,
+    required double alpha,
+    required int rings,
+  }) {
+    final baseColor = isDark
+        ? const Color(0xFFE8A838)
+        : const Color(0xFFD97706);
+
+    for (int ring = 1; ring <= rings; ring++) {
+      final r = radius * (ring / rings);
+      final ringAlpha = alpha * (0.6 + 0.4 * ring / rings);
+      paint.color = baseColor.withValues(alpha: ringAlpha);
+
+      // Draw concentric circle
+      canvas.drawCircle(center, r, paint);
+
+      // Draw petal arcs around the ring
+      final petalRadius = r * 0.3;
+      for (int i = 0; i < petals; i++) {
+        final angle = (2 * pi * i / petals) - pi / 2;
+        final petalCenter = Offset(
+          center.dx + r * cos(angle),
+          center.dy + r * sin(angle),
+        );
+
+        // Petal as a small ellipse
+        canvas.save();
+        canvas.translate(petalCenter.dx, petalCenter.dy);
+        canvas.rotate(angle + pi / 2);
+        final petalRect = Rect.fromCenter(
+          center: Offset.zero,
+          width: petalRadius * 0.6,
+          height: petalRadius,
+        );
+        canvas.drawOval(petalRect, paint);
+        canvas.restore();
+      }
+    }
+
+    // Central dot cluster (tiny)
+    paint.style = PaintingStyle.fill;
+    paint.color = baseColor.withValues(alpha: alpha * 0.5);
+    canvas.drawCircle(center, radius * 0.04, paint);
+    paint.style = PaintingStyle.stroke;
+  }
+
+  @override
+  bool shouldRepaint(covariant _IndianAccentPainter old) =>
+      old.isDark != isDark;
 }
 
 // ─── Sliding Scheme Banner Carousel ──────────────────────────────────────────
@@ -148,7 +301,7 @@ class _SchemeBannerCarouselState extends State<_SchemeBannerCarousel> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(viewportFraction: 0.92);
+    _pageController = PageController(viewportFraction: 1.0);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadSchemes());
   }
 
@@ -296,17 +449,7 @@ class _SchemeBannerCarouselState extends State<_SchemeBannerCarousel> {
                     );
                   },
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: gradient.first.withValues(alpha: 0.25),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
+                    margin: const EdgeInsets.symmetric(horizontal: 0),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(22),
                       child: Container(

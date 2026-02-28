@@ -8,7 +8,7 @@ class AppStrings {
       // App
       'app_name': 'Pragati Connect',
       'welcome_back': 'Welcome back',
-      'empowering': "Empowering\nIndia's",
+      'empowering': "Let's empower\nIndia",
       'informal_workforce': 'Informal\nWorkforce',
 
       // Dashboard
@@ -99,13 +99,50 @@ class AppStrings {
       'help_faq': 'Help & FAQ',
       'privacy_policy': 'Privacy Policy',
       'terms': 'Terms of Service',
+
+      // Profile
+      'profile': 'Profile',
+      'name': 'Name',
+      'occupation': 'Occupation',
+      'gender': 'Gender',
+      'aadhaar_no': 'Aadhaar No.',
+      'phone_no': 'Phone No.',
+      'personal_info': 'Personal Information',
+      'read_only_info': 'Verified Information',
+      'account_actions': 'Account',
+      'reset_account': 'Reset Profile',
+      'delete_account': 'Delete Account',
+      'reset_confirm':
+          'This will clear all your profile data including name, photo, and preferences. This cannot be undone.',
+      'delete_confirm':
+          'This will permanently delete all your data including profile, chat history, and app settings. This cannot be undone.',
+      'cancel': 'Cancel',
+      'confirm': 'Confirm',
+      'save': 'Save',
+      'male': 'Male',
+      'female': 'Female',
+      'other_gender': 'Other',
+      'not_set': 'Not set',
+      'profile_picture': 'Profile Picture',
+      'edit_profile': 'Edit Profile',
+      'change_photo': 'Change Photo',
+      'adjust_size': 'Adjust Size',
+      'preview': 'Preview',
+      'choose_photo': 'Choose Photo',
+      'invalid_aadhaar': 'Invalid format. Aadhaar must be exactly 12 digits.',
+      'invalid_phone':
+          'Invalid format. Phone number must be exactly 10 digits.',
+      'aadhaar_format': 'Format: 1234 XXXX 1234',
+      'phone_format': 'Format: 98XXX XXXXX',
+      'set_photo': 'Set Photo',
+      'pinch_zoom_hint': 'Pinch to zoom • Drag to move',
     },
     'hi': {
       // App
       'app_name': 'प्रगति कनेक्ट',
       'welcome_back': 'वापस स्वागत है',
-      'empowering': 'भारत के\nअनौपचारिक',
-      'informal_workforce': 'कार्यबल को\nसशक्त बनाना',
+      'empowering': 'आइए भारत को\nसशक्त बनाएं',
+      'informal_workforce': 'अनौपचारिक\nकार्यबल',
 
       // Dashboard
       'dashboard': 'डैशबोर्ड',
@@ -193,6 +230,44 @@ class AppStrings {
       'help_faq': 'सहायता और FAQ',
       'privacy_policy': 'गोपनीयता नीति',
       'terms': 'सेवा की शर्तें',
+
+      // Profile
+      'profile': 'प्रोफ़ाइल',
+      'name': 'नाम',
+      'occupation': 'व्यवसाय',
+      'gender': 'लिंग',
+      'aadhaar_no': 'आधार नं.',
+      'phone_no': 'फ़ोन नं.',
+      'personal_info': 'व्यक्तिगत जानकारी',
+      'read_only_info': 'सत्यापित जानकारी',
+      'account_actions': 'खाता',
+      'reset_account': 'प्रोफ़ाइल रीसेट करें',
+      'delete_account': 'खाता हटाएं',
+      'reset_confirm':
+          'यह आपके सभी प्रोफ़ाइल डेटा को मिटा देगा। यह पूर्ववत नहीं किया जा सकता।',
+      'delete_confirm':
+          'यह आपके सभी डेटा को स्थायी रूप से हटा देगा। यह पूर्ववत नहीं किया जा सकता।',
+      'cancel': 'रद्द करें',
+      'confirm': 'पुष्टि करें',
+      'save': 'सहेजें',
+      'male': 'पुरुष',
+      'female': 'महिला',
+      'other_gender': 'अन्य',
+      'not_set': 'सेट नहीं',
+      'profile_picture': 'प्रोफ़ाइल फ़ोटो',
+      'edit_profile': 'प्रोफ़ाइल संपादित करें',
+      'change_photo': 'फ़ोटो बदलें',
+      'adjust_size': 'आकार समायोजित करें',
+      'preview': 'पूर्वावलोकन',
+      'choose_photo': 'फ़ोटो चुनें',
+      'invalid_aadhaar':
+          'अमान्य प्रारूप। आधार नंबर ठीक 12 अंकों का होना चाहिए।',
+      'invalid_phone': 'अमान्य प्रारूप। फ़ोन नंबर ठीक 10 अंकों का होना चाहिए।',
+      'aadhaar_format': 'प्रारूप: 1234 XXXX 1234',
+      'phone_format': 'प्रारूप: 98XXX XXXXX',
+      'set_photo': 'फ़ोटो सेट करें',
+      'pinch_zoom_hint':
+          'ज़ूम करने के लिए पिंच करें • मूव करने के लिए ड्रैग करें',
     },
   };
 

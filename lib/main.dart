@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'theme.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
+import 'providers/user_profile_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/scheme_assistant_screen.dart';
 import 'screens/voice_assistant_screen.dart';
@@ -11,6 +12,7 @@ import 'screens/settings_screen.dart';
 import 'screens/schemes_screen.dart';
 import 'screens/scheme_detail_screen.dart';
 import 'screens/ai_chat_screen.dart';
+import 'screens/profile_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,12 +29,15 @@ class PragatiConnectApp extends StatefulWidget {
 class _PragatiConnectAppState extends State<PragatiConnectApp> {
   final ThemeProvider _themeProvider = ThemeProvider();
   final LocaleProvider _localeProvider = LocaleProvider();
+  final UserProfileProvider _profileProvider = UserProfileProvider();
 
   @override
   void initState() {
     super.initState();
     _themeProvider.addListener(() => setState(() {}));
     _localeProvider.addListener(() => setState(() {}));
+    _profileProvider.addListener(() => setState(() {}));
+    _profileProvider.loadProfile();
   }
 
   @override
@@ -52,25 +57,27 @@ class _PragatiConnectAppState extends State<PragatiConnectApp> {
       ],
       onGenerateRoute: (settings) {
         final routes = <String, WidgetBuilder>{
-          '/': (_) => const DashboardScreen(),
+          '/': (_) => DashboardScreen(profileProvider: _profileProvider),
           '/scheme-assistant': (_) => const SchemeAssistantScreen(),
-          '/voice-assistant': (_) => const VoiceAssistantScreen(),
+          '/voice-assistant': (_) =>
+              VoiceAssistantScreen(profileProvider: _profileProvider),
           '/business-boost': (_) => const BusinessBoostScreen(),
           '/settings': (_) => SettingsScreen(
             themeProvider: _themeProvider,
             localeProvider: _localeProvider,
           ),
           '/schemes': (_) => const SchemesScreen(),
-          '/ai-chat': (_) => const AiChatScreen(),
+          '/ai-chat': (_) => AiChatScreen(profileProvider: _profileProvider),
           '/scheme-detail': (_) => SchemeDetailScreen(
             schemeName: settings.arguments as String? ?? '',
           ),
+          '/profile': (_) => ProfileScreen(profileProvider: _profileProvider),
         };
 
         final builder = routes[settings.name];
         if (builder == null) {
           return MaterialPageRoute(
-            builder: (_) => const DashboardScreen(),
+            builder: (_) => DashboardScreen(profileProvider: _profileProvider),
             settings: settings,
           );
         }

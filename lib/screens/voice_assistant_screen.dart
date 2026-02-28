@@ -6,9 +6,11 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import '../l10n/app_strings.dart';
 import '../services/gemini_service.dart';
+import '../providers/user_profile_provider.dart';
 
 class VoiceAssistantScreen extends StatefulWidget {
-  const VoiceAssistantScreen({super.key});
+  final UserProfileProvider profileProvider;
+  const VoiceAssistantScreen({super.key, required this.profileProvider});
 
   @override
   State<VoiceAssistantScreen> createState() => _VoiceAssistantScreenState();

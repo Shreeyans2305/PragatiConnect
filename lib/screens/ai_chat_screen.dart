@@ -9,9 +9,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_strings.dart';
 import '../services/gemini_service.dart';
+import '../providers/user_profile_provider.dart';
 
 class AiChatScreen extends StatefulWidget {
-  const AiChatScreen({super.key});
+  final UserProfileProvider profileProvider;
+  const AiChatScreen({super.key, required this.profileProvider});
 
   @override
   State<AiChatScreen> createState() => _AiChatScreenState();
