@@ -1,4 +1,7 @@
 .kiro
+# Environment files (contain secrets)
+.env
+
 # Flutter/Dart/Pub related
 .dart_tool/
 .packages
