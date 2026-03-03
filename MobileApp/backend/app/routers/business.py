@@ -30,6 +30,7 @@ def get_language_name(code: str) -> str:
     languages = {
         "en": "English",
         "hi": "Hindi",
+        "mr": "Marathi",
         "ta": "Tamil",
         "te": "Telugu",
         "bn": "Bengali",

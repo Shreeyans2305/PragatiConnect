@@ -123,7 +123,8 @@ def get_language_name(code: str) -> str:
     """Get full language name from code."""
     languages = {
         "en": "English",
-        "hi": "Hindi", 
+        "hi": "Hindi",
+        "mr": "Marathi",
         "ta": "Tamil",
         "te": "Telugu",
         "bn": "Bengali",

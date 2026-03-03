@@ -16,6 +16,61 @@ class BedrockService:
             aws_secret_access_key=settings.aws_secret_access_key,
         )
         self.model_id = settings.bedrock_model_id
+        # Detect if using Nova or Claude model
+        self.is_nova = "nova" in self.model_id.lower()
+
+    def _build_nova_request(
+        self,
+        messages: List[Dict],
+        system_prompt: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> Dict:
+        """Build request body for Amazon Nova models."""
+        # Nova uses different message format
+        nova_messages = []
+        for msg in messages:
+            content = msg.get("content", "")
+            # Nova expects content as array of objects
+            if isinstance(content, str):
+                content = [{"text": content}]
+            nova_messages.append({
+                "role": msg["role"],
+                "content": content
+            })
+        
+        return {
+            "inferenceConfig": {
+                "max_new_tokens": max_tokens,
+                "temperature": temperature,
+            },
+            "system": [{"text": system_prompt}] if system_prompt else [],
+            "messages": nova_messages,
+        }
+
+    def _build_claude_request(
+        self,
+        messages: List[Dict],
+        system_prompt: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> Dict:
+        """Build request body for Anthropic Claude models."""
+        return {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "system": system_prompt,
+            "messages": messages,
+        }
+
+    def _parse_nova_response(self, response_body: Dict) -> str:
+        """Parse response from Nova models."""
+        return response_body["output"]["message"]["content"][0]["text"]
+
+    def _parse_claude_response(self, response_body: Dict) -> str:
+        """Parse response from Claude models."""
+        return response_body["content"][0]["text"]
 
     async def generate_response(
         self,
@@ -25,7 +80,7 @@ class BedrockService:
         max_tokens: int = 1024,
         temperature: float = 0.7,
     ) -> str:
-        """Generate a text response using Claude on Bedrock."""
+        """Generate a text response using Claude or Nova on Bedrock."""
         
         messages = []
         
@@ -43,13 +98,11 @@ class BedrockService:
             "content": prompt
         })
 
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "system": system_prompt,
-            "messages": messages,
-        }
+        # Build request based on model type
+        if self.is_nova:
+            request_body = self._build_nova_request(messages, system_prompt, max_tokens, temperature)
+        else:
+            request_body = self._build_claude_request(messages, system_prompt, max_tokens, temperature)
 
         try:
             response = self.client.invoke_model(
@@ -60,7 +113,12 @@ class BedrockService:
             )
             
             response_body = json.loads(response["body"].read())
-            return response_body["content"][0]["text"]
+            
+            # Parse response based on model type
+            if self.is_nova:
+                return self._parse_nova_response(response_body)
+            else:
+                return self._parse_claude_response(response_body)
         
         except Exception as e:
             print(f"Bedrock error: {e}")
@@ -72,39 +130,68 @@ class BedrockService:
         prompt: str,
         system_prompt: str,
         max_tokens: int = 2048,
+        media_type: str = "image/jpeg",
     ) -> Dict[str, Any]:
-        """Analyze an image using Claude Vision on Bedrock."""
+        """Analyze an image using Claude or Nova Vision on Bedrock."""
         
         # Encode image to base64
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
         
-        # Determine media type (assume JPEG for now)
-        media_type = "image/jpeg"
+        # Use the provided media type
+        # media_type = "image/jpeg"  # Now passed as parameter
 
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "system": system_prompt,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": image_base64,
+        if self.is_nova:
+            # Nova vision format
+            request_body = {
+                "inferenceConfig": {
+                    "max_new_tokens": max_tokens,
+                },
+                "system": [{"text": system_prompt}] if system_prompt else [],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "image": {
+                                    "format": media_type.split("/")[1],
+                                    "source": {
+                                        "bytes": image_base64,
+                                    },
+                                },
                             },
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt,
-                        },
-                    ],
-                }
-            ],
-        }
+                            {
+                                "text": prompt,
+                            },
+                        ],
+                    }
+                ],
+            }
+        else:
+            # Claude vision format
+            request_body = {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": max_tokens,
+                "system": system_prompt,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": image_base64,
+                                },
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt,
+                            },
+                        ],
+                    }
+                ],
+            }
 
         try:
             response = self.client.invoke_model(
@@ -115,7 +202,12 @@ class BedrockService:
             )
             
             response_body = json.loads(response["body"].read())
-            response_text = response_body["content"][0]["text"]
+            
+            # Parse response based on model type
+            if self.is_nova:
+                response_text = self._parse_nova_response(response_body)
+            else:
+                response_text = self._parse_claude_response(response_body)
             
             # Try to parse as JSON
             try:

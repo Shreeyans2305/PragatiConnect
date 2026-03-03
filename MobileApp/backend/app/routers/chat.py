@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends
 import uuid
+import base64
 from datetime import datetime
 
 from app.dependencies import get_current_user
 from app.db.dynamodb import dynamodb
 from app.services.bedrock_service import bedrock_service
-from app.services.prompts import CHAT_ASSISTANT_PROMPT, VOICE_ASSISTANT_PROMPT
+from app.services.gemini_service import gemini_service
+from app.services.prompts import CHAT_ASSISTANT_PROMPT, VOICE_ASSISTANT_PROMPT, IMAGE_ANALYSIS_PROMPT
 from app.models.chat import (
     ChatRequest,
     ChatResponse,
+    ChatWithImageRequest,
     VoiceQueryRequest,
     VoiceQueryResponse,
     ConversationHistory,
@@ -17,11 +20,42 @@ from app.models.chat import (
 router = APIRouter()
 
 
+async def generate_ai_response(
+    prompt: str,
+    system_prompt: str,
+    conversation_history=None,
+    max_tokens: int = 1024,
+) -> str:
+    """Generate AI response with Bedrock primary, Gemini fallback."""
+    try:
+        # Try Bedrock first
+        return await bedrock_service.generate_response(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            conversation_history=conversation_history,
+            max_tokens=max_tokens,
+        )
+    except Exception as bedrock_error:
+        print(f"Bedrock failed, trying Gemini fallback: {bedrock_error}")
+        
+        # Fallback to Gemini
+        if gemini_service.is_available:
+            return await gemini_service.generate_response(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                conversation_history=conversation_history,
+                max_tokens=max_tokens,
+            )
+        else:
+            raise Exception(f"Both Bedrock and Gemini unavailable. Bedrock error: {bedrock_error}")
+
+
 def get_language_name(code: str) -> str:
     """Get full language name from code."""
     languages = {
         "en": "English",
         "hi": "Hindi",
+        "mr": "Marathi",
         "ta": "Tamil",
         "te": "Telugu",
         "bn": "Bengali",
@@ -51,8 +85,8 @@ async def send_message(
         language=get_language_name(request.language),
     )
     
-    # Get AI response
-    response_text = await bedrock_service.generate_response(
+    # Get AI response (Bedrock with Gemini fallback)
+    response_text = await generate_ai_response(
         prompt=request.message,
         system_prompt=system_prompt,
         conversation_history=history[-10:],  # Last 10 messages for context
@@ -108,6 +142,18 @@ async def get_history(
     }
 
 
+def _is_detailed_question(transcript: str) -> bool:
+    """Check if the question requires a detailed response."""
+    detailed_keywords = [
+        "how to", "kaise", "explain", "batao", "process", "steps",
+        "eligibility", "apply", "register", "documents", "required",
+        "full details", "poora", "complete", "tell me about", "what is",
+        "benefits", "fayde", "requirements", "zaroorat"
+    ]
+    transcript_lower = transcript.lower()
+    return any(keyword in transcript_lower for keyword in detailed_keywords)
+
+
 @router.post("/voice-query", response_model=VoiceQueryResponse)
 async def voice_query(
     request: VoiceQueryRequest,
@@ -119,18 +165,94 @@ async def voice_query(
         user_name=current_user.get("name", "User"),
         user_trade=current_user.get("primary_trade", "worker"),
         user_location=current_user.get("location", "India"),
+        user_state=current_user.get("state", ""),
         language=get_language_name(request.language),
         transcript=request.transcript,
     )
     
-    # Get AI response
-    response_text = await bedrock_service.generate_response(
-        prompt=request.transcript,
+    # Determine if this needs a detailed response
+    needs_detail = _is_detailed_question(request.transcript)
+    
+    # Enhance prompt for detailed questions
+    prompt = request.transcript
+    if needs_detail:
+        prompt = f"[GIVE A DETAILED 4-6 SENTENCE RESPONSE] {request.transcript}"
+    
+    # Get AI response (Bedrock with Gemini fallback)
+    response_text = await generate_ai_response(
+        prompt=prompt,
         system_prompt=system_prompt,
-        max_tokens=512,  # Shorter for voice responses
+        max_tokens=500 if needs_detail else 200,
     )
     
     return VoiceQueryResponse(
         response=response_text,
         language=request.language,
     )
+
+
+@router.post("/analyze-image", response_model=ChatResponse)
+async def analyze_image(
+    request: ChatWithImageRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Analyze an image and return AI response."""
+    conversation_id = str(uuid.uuid4())
+    
+    # Build system prompt
+    system_prompt = IMAGE_ANALYSIS_PROMPT.format(
+        user_name=current_user.get("name", "User"),
+        user_trade=current_user.get("primary_trade", "worker"),
+        user_location=current_user.get("location", "India"),
+        user_state=current_user.get("state", ""),
+        language=get_language_name(request.language),
+        user_message=request.message,
+    )
+    
+    try:
+        # Decode base64 image
+        image_bytes = base64.b64decode(request.image_base64)
+        
+        # Analyze image using Bedrock
+        result = await bedrock_service.analyze_image(
+            image_bytes=image_bytes,
+            prompt=request.message,
+            system_prompt=system_prompt,
+            max_tokens=2048,
+            media_type=request.image_type,
+        )
+        
+        # Extract response text
+        if isinstance(result, dict):
+            response_text = result.get("raw_response", str(result))
+        else:
+            response_text = str(result)
+        
+        return ChatResponse(
+            response=response_text,
+            conversation_id=conversation_id,
+            language=request.language,
+        )
+        
+    except Exception as e:
+        print(f"Image analysis error: {e}")
+        # Try Gemini fallback
+        try:
+            response_text = await gemini_service.analyze_image(
+                image_bytes=base64.b64decode(request.image_base64),
+                prompt=request.message,
+                system_prompt=system_prompt,
+                media_type=request.image_type,
+            )
+            return ChatResponse(
+                response=response_text,
+                conversation_id=conversation_id,
+                language=request.language,
+            )
+        except Exception as fallback_error:
+            print(f"Gemini fallback also failed: {fallback_error}")
+            return ChatResponse(
+                response=f"Sorry, I couldn't analyze the image. Please try again.",
+                conversation_id=conversation_id,
+                language=request.language,
+            )

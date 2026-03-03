@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 from app.config import settings
-from app.routers import auth, profile, chat, schemes, price, business
+from app.routers import auth, profile, chat, schemes, price, business, voice
 
 # Create FastAPI app
 app = FastAPI(
@@ -27,6 +27,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(profile.router, prefix="/api/v1/profile", tags=["Profile"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
+app.include_router(voice.router, prefix="/api/v1/voice", tags=["Voice Assistant"])
 app.include_router(schemes.router, prefix="/api/v1/schemes", tags=["Schemes"])
 app.include_router(price.router, prefix="/api/v1/price", tags=["Price Estimation"])
 app.include_router(business.router, prefix="/api/v1/business", tags=["Business Tools"])

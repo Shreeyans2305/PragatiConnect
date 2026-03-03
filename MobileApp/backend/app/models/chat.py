@@ -13,8 +13,16 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Chat message request."""
     message: str = Field(..., min_length=1, max_length=4000)
-    language: str = Field(default="hi", pattern=r"^(en|hi|ta|te|bn)$")
+    language: str = Field(default="hi", pattern=r"^(en|hi|mr|ta|te|bn)$")
     conversation_id: Optional[str] = None
+
+
+class ChatWithImageRequest(BaseModel):
+    """Chat message with image request."""
+    message: str = Field(default="Please analyze this image.", max_length=4000)
+    image_base64: str = Field(..., description="Base64 encoded image data")
+    image_type: str = Field(default="image/jpeg", pattern=r"^image/(jpeg|png|gif|webp)$")
+    language: str = Field(default="hi", pattern=r"^(en|hi|mr|ta|te|bn)$")
 
 
 class ChatResponse(BaseModel):
@@ -27,7 +35,7 @@ class ChatResponse(BaseModel):
 class VoiceQueryRequest(BaseModel):
     """Voice query request."""
     transcript: str = Field(..., min_length=1, max_length=2000)
-    language: str = Field(default="hi", pattern=r"^(en|hi|ta|te|bn)$")
+    language: str = Field(default="hi", pattern=r"^(en|hi|mr|ta|te|bn)$")
 
 
 class VoiceQueryResponse(BaseModel):

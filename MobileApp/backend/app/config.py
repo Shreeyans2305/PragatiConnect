@@ -18,10 +18,20 @@ class Settings(BaseSettings):
 
     # S3 Configuration
     s3_bucket_images: str = "pragati-images"
+    s3_bucket_audio: str = "pragati-audio"  # For storing voice recordings
 
     # Amazon Bedrock
     bedrock_model_id: str = "anthropic.claude-3-sonnet-20240229-v1:0"
     bedrock_knowledge_base_id: str = ""
+
+    # Google Cloud Configuration
+    # Path to service account JSON file (standard Google Cloud env var)
+    google_application_credentials: str = ""
+    google_cloud_credentials_path: str = ""
+    google_cloud_project_id: str = ""
+
+    # Gemini API (fallback when Bedrock unavailable)
+    gemini_api_key: str = ""
 
     # JWT Configuration
     jwt_secret: str = "change_me_in_production"
