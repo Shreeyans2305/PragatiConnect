@@ -213,6 +213,14 @@ class BedrockService:
             try:
                 return json.loads(response_text)
             except json.JSONDecodeError:
+                # Try to extract JSON from response text (might have extra content)
+                import re
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    try:
+                        return json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        pass
                 return {"raw_response": response_text}
         
         except Exception as e:

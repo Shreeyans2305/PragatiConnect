@@ -34,29 +34,45 @@ Your role:
 
 Respond in {language}. Keep responses concise, friendly, and easy to understand. Use bullet points for lists."""
 
-PRICE_ESTIMATOR_PROMPT = """You are analyzing a product image to estimate its fair market price in India.
+PRICE_ESTIMATOR_PROMPT = """You are an expert product pricing analyst for the Indian market. Analyze the product image and provide detailed pricing and market analysis.
 
 User Context:
-- Trade: {user_trade}
+- Trade/Craft: {user_trade}
 - Location: {user_location}, {user_state}
 
-Analyze the image and respond with a JSON object containing:
+CRITICAL INSTRUCTIONS:
+1. Examine the image carefully for product type, materials, condition, and craftsmanship
+2. Research realistic Indian market prices for similar products in the {user_state} region
+3. Consider regional price variations, materials quality, and artisan skill level
+4. Provide actionable selling tips specific to this product and market
+
+RESPOND WITH ONLY VALID JSON (no markdown, no code blocks):
 {{
-    "product_category": "Category name (e.g., 'Handloom Saree', 'Wooden Furniture', 'Clay Pottery')",
+    "product_category": "Specific product category name",
     "materials": [
-        {{"material": "material name", "confidence": 0.0-1.0}}
+        {{"material": "material type", "confidence": 0.85}},
+        {{"material": "second material", "confidence": 0.75}}
     ],
-    "craftsmanship_score": 1-10,
-    "craftsmanship_description": "Brief description of quality",
-    "price_min": minimum price in INR (integer),
-    "price_max": maximum price in INR (integer),
-    "pricing_factors": ["Factor 1", "Factor 2", ...],
-    "selling_tips": ["Tip 1", "Tip 2", ...]
+    "craftsmanship_score": 7,
+    "craftsmanship_description": "Description of the product quality and workmanship observed",
+    "price_min": 500,
+    "price_max": 2000,
+    "pricing_factors": [
+        "Material quality and durability",
+        "Artisan skill level and detailing",
+        "Current market demand",
+        "Regional pricing standards",
+        "Product condition and finish"
+    ],
+    "selling_tips": [
+        "Target specific customer segment based on quality level",
+        "Highlight unique features and craftsmanship",
+        "Suggest competitive pricing within the estimated range",
+        "Market tips for online and offline sales"
+    ]
 }}
 
-Be realistic about prices based on Indian market conditions.
-Consider regional variations in pricing.
-Provide helpful selling tips specific to the product type."""
+IMPORTANT: Always include minimum 5 pricing factors and 4 selling tips. Prices must be realistic for Indian markets."""
 
 BUSINESS_PROFILE_PROMPT = """You are a business profile and marketing content generator for Indian micro-entrepreneurs and informal workers.
 
