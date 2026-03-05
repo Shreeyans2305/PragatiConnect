@@ -43,7 +43,7 @@ class SchemeQueryRequest(BaseModel):
     """Question about a scheme."""
     scheme_id: str
     question: str = Field(..., min_length=1, max_length=1000)
-    language: str = Field(default="hi", pattern=r"^(en|hi|mr|ta|te|bn)$")
+    language: str = Field(default="hi", pattern=r"^(en|hi|mr|ta|te|bn|gu|pa)$")
 
 
 class SchemeQueryResponse(BaseModel):

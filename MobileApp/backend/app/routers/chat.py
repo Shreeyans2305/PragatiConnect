@@ -159,15 +159,25 @@ async def voice_query(
     request: VoiceQueryRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Process a voice query and return response."""
-    # Build system prompt
+    """Process a voice query and return response with conversation memory.
+    
+    If conversation_id is provided, loads history and maintains context.
+    Otherwise creates new conversation.
+    """
+    phone = current_user["phone_number"]
+    conv_id = request.conversation_id or str(uuid.uuid4())
+    
+    # Load conversation history if exists
+    conversation = dynamodb.get_conversation(phone, conv_id)
+    history = conversation.get("messages", []) if conversation else []
+    
+    # Build system prompt with user context
     system_prompt = VOICE_ASSISTANT_PROMPT.format(
         user_name=current_user.get("name", "User"),
         user_trade=current_user.get("primary_trade", "worker"),
         user_location=current_user.get("location", "India"),
         user_state=current_user.get("state", ""),
-        language=get_language_name(request.language),
-        transcript=request.transcript,
+        language="English" if request.language == "en" else "Hindi",
     )
     
     # Determine if this needs a detailed response
@@ -178,16 +188,36 @@ async def voice_query(
     if needs_detail:
         prompt = f"[GIVE A DETAILED 4-6 SENTENCE RESPONSE] {request.transcript}"
     
-    # Get AI response (Bedrock with Gemini fallback)
+    # Get AI response with conversation history
     response_text = await generate_ai_response(
         prompt=prompt,
         system_prompt=system_prompt,
+        conversation_history=history[-10:],  # Use last 10 messages for context
         max_tokens=500 if needs_detail else 200,
     )
+    
+    # Save messages to conversation history
+    user_message = {
+        "role": "user",
+        "content": request.transcript,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    assistant_message = {
+        "role": "assistant",
+        "content": response_text,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    
+    if conversation:
+        dynamodb.add_message_to_conversation(phone, conv_id, user_message)
+        dynamodb.add_message_to_conversation(phone, conv_id, assistant_message)
+    else:
+        dynamodb.create_conversation(phone, conv_id, [user_message, assistant_message])
     
     return VoiceQueryResponse(
         response=response_text,
         language=request.language,
+        conversation_id=conv_id,
     )
 
 

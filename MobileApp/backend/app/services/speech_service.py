@@ -51,14 +51,19 @@ class SpeechService:
         "pa": "pa-IN",      # Punjabi
     }
 
-    # TTS Voice mappings (using Wavenet voices for quality)
+    # TTS Voice mappings (using Wavenet female voices for quality)
+    # Female voice codes: A, C are typically female; B, D are typically male
     TTS_VOICES = {
-        "en": ("en-IN-Wavenet-D", texttospeech.SsmlVoiceGender.MALE),
-        "hi": ("hi-IN-Wavenet-D", texttospeech.SsmlVoiceGender.MALE),
-        "ta": ("ta-IN-Wavenet-D", texttospeech.SsmlVoiceGender.MALE),
-        "te": ("te-IN-Standard-B", texttospeech.SsmlVoiceGender.MALE),
-        "bn": ("bn-IN-Wavenet-B", texttospeech.SsmlVoiceGender.MALE),
-        "mr": ("mr-IN-Wavenet-B", texttospeech.SsmlVoiceGender.MALE),
+        "en": ("en-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female English
+        "hi": ("hi-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female Hindi
+        "ta": ("ta-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female Tamil
+        "te": ("te-IN-Standard-A", texttospeech.SsmlVoiceGender.FEMALE), # Female Telugu
+        "bn": ("bn-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female Bengali
+        "mr": ("mr-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female Marathi
+        "gu": ("gu-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female Gujarati
+        "kn": ("kn-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female Kannada
+        "ml": ("ml-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female Malayalam
+        "pa": ("pa-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE),  # Female Punjabi
     }
 
     async def transcribe_audio(
@@ -212,7 +217,7 @@ class SpeechService:
         """
         gc_language_code = self.LANGUAGE_CODES.get(language_code, "hi-IN")
         voice_name, gender = self.TTS_VOICES.get(
-            language_code, ("hi-IN-Wavenet-D", texttospeech.SsmlVoiceGender.MALE)
+            language_code, ("hi-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE)
         )
 
         # Build synthesis input
@@ -280,7 +285,7 @@ class SpeechService:
         """
         gc_language_code = self.LANGUAGE_CODES.get(language_code, "hi-IN")
         voice_name, gender = self.TTS_VOICES.get(
-            language_code, ("hi-IN-Wavenet-D", texttospeech.SsmlVoiceGender.MALE)
+            language_code, ("hi-IN-Wavenet-A", texttospeech.SsmlVoiceGender.FEMALE)
         )
 
         synthesis_input = texttospeech.SynthesisInput(ssml=ssml)

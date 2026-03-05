@@ -1,30 +1,65 @@
 # Cloud Services Setup Guide
 
-This guide walks you through configuring Google Cloud (Speech-to-Text, Text-to-Speech) and AWS services (Bedrock, DynamoDB, S3) for PragatiConnect.
+This guide walks you through configuring Google Cloud Text-to-Speech and AWS Bedrock services for PragatiConnect.
 
 ## Architecture Overview
 
 ```
-┌─────────────────┐     ┌──────────────────────────────────────────────────────┐
-│   Mobile App    │     │                   Backend (FastAPI)                   │
-│    (Flutter)    │────▶│                                                      │
-│                 │     │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│  Records Audio  │     │  │ Google STT  │  │ AWS Bedrock │  │ Google TTS  │   │
-│       ↓         │     │  │(Speech→Text)│─▶│   Claude    │─▶│(Text→Speech)│   │
-│  Sends to API   │     │  └─────────────┘  └─────────────┘  └─────────────┘   │
-└─────────────────┘     │                          │                           │
-        ▲               │              ┌───────────┴───────────┐               │
-        │               │              ▼                       ▼               │
-        │               │     ┌─────────────┐         ┌─────────────┐          │
-        │               │     │  DynamoDB   │         │     S3      │          │
-        └───────────────│─────│ (History)   │         │  (Files)    │          │
-     Audio Response     │     └─────────────┘         └─────────────┘          │
-                        └──────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Mobile App (Flutter)                                │
+│  ┌─────────────────────────────────────────────────────────────────────────┐    │
+│  │  speech_to_text package (Device STT - no cloud needed for transcription) │    │
+│  │  Records audio → Transcribes on-device → Sends TEXT to backend          │    │
+│  └─────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        │ POST /api/v1/chat/voice-query
+                                        │ { "query": "transcribed text", "language": "hi" }
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           Backend (FastAPI)                                      │
+│                                                                                  │
+│  ┌─────────────────────────────┐    ┌─────────────────────────────────────────┐ │
+│  │     AWS Bedrock             │    │      Google Cloud TTS                   │ │
+│  │  ┌───────────────────────┐  │    │   (All Female WaveNet Voices)          │ │
+│  │  │ Amazon Nova Lite      │  │    │                                         │ │
+│  │  │ (Recommended - 50x    │  │───▶│   Text Response → Female Voice Audio   │ │
+│  │  │  cheaper than Claude) │  │    │   Returns MP3 to mobile app            │ │
+│  │  └───────────────────────┘  │    └─────────────────────────────────────────┘ │
+│  │  ┌───────────────────────┐  │                       │                        │
+│  │  │ Claude 3 Sonnet       │  │                       │                        │
+│  │  │ (More capable)        │  │                       │                        │
+│  │  └───────────────────────┘  │                       │                        │
+│  └─────────────────────────────┘                       │                        │
+│                                                        ▼                        │
+│                                      ┌──────────────────────────────┐           │
+│                                      │    DynamoDB (Chat History)   │           │
+│                                      │    S3 (Image Storage)        │           │
+│                                      └──────────────────────────────┘           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        │ Response: { "response": "...", 
+                                        │            "audio_content": "base64 MP3",
+                                        │            "audio_format": "mp3" }
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           Mobile App (Flutter)                                   │
+│  Plays MP3 audio response with female voice                                     │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Key Architecture Points
+
+1. **Device-side STT**: Speech recognition happens on the mobile device using Flutter's `speech_to_text` package (no Google Cloud STT needed)
+2. **Text-based API**: Backend receives text queries, not audio files
+3. **Bedrock AI**: Processes queries using Nova Lite (recommended) or Claude 3 Sonnet
+4. **Female TTS**: All responses use Google Cloud female WaveNet voices for natural sound
 
 ---
 
-## Part 1: Google Cloud Setup
+## Part 1: Google Cloud Setup (Text-to-Speech Only)
+
+> **Note**: We only use Google Cloud for Text-to-Speech. Speech recognition is handled on-device by the Flutter app.
 
 ### 1.1 Create a Google Cloud Project
 
@@ -36,14 +71,11 @@ This guide walks you through configuring Google Cloud (Speech-to-Text, Text-to-S
 
 ### 1.2 Enable Required APIs
 
-Enable these APIs in your project:
+Enable the Text-to-Speech API in your project:
 
 ```bash
 # Using gcloud CLI (recommended)
 gcloud config set project YOUR_PROJECT_ID
-
-# Enable Speech-to-Text API
-gcloud services enable speech.googleapis.com
 
 # Enable Text-to-Speech API
 gcloud services enable texttospeech.googleapis.com
@@ -52,7 +84,6 @@ gcloud services enable texttospeech.googleapis.com
 Or via Console:
 1. Go to **APIs & Services** → **Library**
 2. Search and enable:
-   - **Cloud Speech-to-Text API**
    - **Cloud Text-to-Speech API**
 
 ### 1.3 Create Service Account
@@ -60,11 +91,10 @@ Or via Console:
 1. Go to **IAM & Admin** → **Service Accounts**
 2. Click **Create Service Account**
 3. Details:
-   - Name: `pragati-voice-service`
-   - Description: `Service account for PragatiConnect voice features`
+   - Name: `pragati-tts-service`
+   - Description: `Service account for PragatiConnect Text-to-Speech`
 4. Click **Create and Continue**
-5. Grant roles (click **Add Another Role** to add multiple):
-   - `Cloud Speech Client` (for Speech-to-Text)
+5. Grant roles:
    - `Service Usage Consumer` (allows calling enabled APIs)
    
    **Note:** Text-to-Speech doesn't have a specific role - it's controlled by enabling the API. The Service Usage Consumer role allows the service account to call any enabled API.
@@ -94,15 +124,28 @@ GOOGLE_CLOUD_CREDENTIALS_PATH=/path/to/gcp-service-account.json
 GOOGLE_CLOUD_PROJECT_ID=your-project-id
 ```
 
-### 1.6 Pricing (Important!)
+### 1.6 Pricing & Voice Configuration
 
-**Speech-to-Text:**
-| Feature | Free Tier | Paid |
-|---------|-----------|------|
-| Standard models | 60 min/month free | $0.006/15 sec |
-| Enhanced models | 60 min/month free | $0.009/15 sec |
+**Text-to-Speech Voices (All Female):**
 
-**Text-to-Speech:**
+The app uses female WaveNet voices for all Indian languages. These provide natural, high-quality speech:
+
+| Language | Voice ID | Type | Gender |
+|----------|----------|------|--------|
+| English | `en-IN-Wavenet-A` | WaveNet | Female |
+| Hindi | `hi-IN-Wavenet-A` | WaveNet | Female |
+| Tamil | `ta-IN-Wavenet-A` | WaveNet | Female |
+| Telugu | `te-IN-Standard-A` | Standard* | Female |
+| Bengali | `bn-IN-Wavenet-A` | WaveNet | Female |
+| Marathi | `mr-IN-Wavenet-A` | WaveNet | Female |
+| Gujarati | `gu-IN-Wavenet-A` | WaveNet | Female |
+| Kannada | `kn-IN-Wavenet-A` | WaveNet | Female |
+| Malayalam | `ml-IN-Wavenet-A` | WaveNet | Female |
+| Punjabi | `pa-IN-Wavenet-A` | WaveNet | Female |
+
+*Telugu uses Standard voice because WaveNet is not available for this language.
+
+**Text-to-Speech Pricing:**
 | Voice Type | Free Tier | Paid |
 |------------|-----------|------|
 | Standard | 4M chars/month | $4/1M chars |
@@ -110,7 +153,6 @@ GOOGLE_CLOUD_PROJECT_ID=your-project-id
 | Neural2 | 1M chars/month | $16/1M chars |
 
 💡 **Cost Optimization Tips:**
-- Use standard voices for non-critical responses
 - Cache frequently used audio responses
 - Set usage quotas in GCP Console
 
@@ -135,22 +177,31 @@ GOOGLE_CLOUD_PROJECT_ID=your-project-id
 2. Select your region (e.g., `us-east-1` or `ap-south-1`)
 3. Go to **Model access** → **Manage model access**
 4. Request access to:
-   - **Anthropic Claude 3 Sonnet**
-   - **Anthropic Claude 3 Haiku** (optional, faster/cheaper)
-5. Wait for approval (usually instant)
+   - **Amazon Nova Lite** ⭐ (Recommended - much faster & cheaper)
+   - **Anthropic Claude 3 Sonnet** (More capable, higher quality)
+5. Wait for approval (usually instant for Nova, may take time for Claude)
 
-#### Note Model IDs
+#### Available Model IDs
 
 ```bash
-# Claude 3 Sonnet (recommended for quality)
+# Amazon Nova Lite (RECOMMENDED - 50x cheaper than Claude!)
+amazon.nova-lite-v1:0
+
+# Anthropic Claude 3 Sonnet (more capable, but expensive)
 anthropic.claude-3-sonnet-20240229-v1:0
-
-# Claude 3 Haiku (faster, cheaper)
-anthropic.claude-3-haiku-20240307-v1:0
-
-# Claude 3.5 Sonnet (latest, if available)
-anthropic.claude-3-5-sonnet-20241022-v2:0
 ```
+
+#### Model Auto-Detection
+
+The backend automatically detects the model type and uses the appropriate request format:
+
+```python
+# In bedrock_service.py
+self.is_nova = "nova" in self.model_id.lower()
+```
+
+- **Nova models**: Use Amazon's native request/response format
+- **Claude models**: Use Anthropic's Messages API format
 
 ### 2.3 Create DynamoDB Tables
 
@@ -232,12 +283,20 @@ For enhanced scheme recommendations with RAG:
 
 ### 2.6 AWS Pricing
 
-**Bedrock (Claude):**
-| Model | Input | Output |
-|-------|-------|--------|
-| Claude 3 Haiku | $0.00025/1K tokens | $0.00125/1K tokens |
-| Claude 3 Sonnet | $0.003/1K tokens | $0.015/1K tokens |
-| Claude 3.5 Sonnet | $0.003/1K tokens | $0.015/1K tokens |
+**Bedrock AI Models:**
+
+| Model | Input | Output | Notes |
+|-------|-------|--------|-------|
+| **Amazon Nova Lite** ⭐ | $0.00006/1K tokens | $0.00024/1K tokens | **~50x cheaper!** Recommended |
+| Claude 3 Sonnet | $0.003/1K tokens | $0.015/1K tokens | Higher quality, expensive |
+
+> 💡 **Nova Lite is the default recommendation** - it's dramatically cheaper while providing good quality for agricultural assistant use cases.
+
+**Cost Comparison Example (1000 queries/day):**
+| Model | Daily Cost | Monthly Cost |
+|-------|------------|--------------|
+| Nova Lite | ~$0.15 | ~$4.50 |
+| Claude 3 Sonnet | ~$9.00 | ~$270 |
 
 **DynamoDB:** Pay per request (~$1.25 per million writes)
 
@@ -266,14 +325,21 @@ DYNAMODB_TABLE_ESTIMATES=pragati-estimates
 S3_BUCKET_IMAGES=pragati-images-123456789
 S3_BUCKET_AUDIO=pragati-audio-123456789
 
-# Amazon Bedrock
-BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
-BEDROCK_KNOWLEDGE_BASE_ID=  # Optional
+# Amazon Bedrock - Choose one:
+# Option 1: Nova Lite (RECOMMENDED - 50x cheaper)
+BEDROCK_MODEL_ID=amazon.nova-lite-v1:0
+
+# Option 2: Claude 3 Sonnet (more capable, higher cost)
+# BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+
+# Optional: Knowledge Base for RAG
+BEDROCK_KNOWLEDGE_BASE_ID=
 
 # ============================================
 # Google Cloud Configuration
 # ============================================
-GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/gcp-service-account.json
+# Set the path to your service account JSON file
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/gcp-service-account.json
 GOOGLE_CLOUD_PROJECT_ID=pragati-connect-123456
 
 # ============================================
@@ -288,42 +354,70 @@ JWT_EXPIRY_HOURS=24
 # ============================================
 DEBUG=false
 CORS_ORIGINS=https://your-app-domain.com
-OTP_MOCK_MODE=false
+
+# ============================================
+# Testing/Development Mode
+# ============================================
+# Set these for local development to skip real OTP verification
+OTP_MOCK_MODE=true
+OTP_MOCK_CODE=123456
 ```
 
 ---
 
 ## Part 4: API Endpoints
 
-### Voice Endpoints
+### Voice/Chat Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/voice/query` | POST | Full voice pipeline (multipart audio) |
-| `/api/v1/voice/query-base64` | POST | Full voice pipeline (base64 JSON) |
-| `/api/v1/voice/transcribe` | POST | Speech-to-text only |
-| `/api/v1/voice/synthesize` | POST | Text-to-speech only |
+| `/api/v1/chat/voice-query` | POST | Main voice query endpoint (text in → text + audio out) |
+| `/api/v1/voice/synthesize` | POST | Text-to-speech only (convert text to female voice audio) |
 
-### Example: Full Voice Query
+### Example: Voice Query (Main Flow)
+
+The mobile app transcribes speech on-device and sends text:
 
 ```bash
-curl -X POST "https://api.pragaticonnect.com/api/v1/voice/query" \
+curl -X POST "https://api.pragaticonnect.com/api/v1/chat/voice-query" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -F "audio_file=@recording.wav" \
-  -F "language=hi" \
-  -F "conversation_id=conv_123"
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "मुझे PM किसान योजना के बारे में बताओ",
+    "language": "hi",
+    "conversation_id": "conv_123"
+  }'
 ```
 
 Response:
 ```json
 {
-  "user_transcript": "मुझे PM किसान योजना के बारे में बताओ",
-  "ai_response": "PM किसान सम्मान निधि योजना में...",
-  "audio_response": "base64_encoded_mp3_audio...",
+  "response": "PM किसान सम्मान निधि योजना में किसानों को प्रति वर्ष ₹6,000 की आर्थिक सहायता दी जाती है...",
+  "audio_content": "base64_encoded_mp3_audio...",
   "audio_format": "mp3",
   "conversation_id": "conv_123",
-  "language": "hi",
-  "stt_confidence": 0.95
+  "language": "hi"
+}
+```
+
+### Example: Text-to-Speech Only
+
+```bash
+curl -X POST "https://api.pragaticonnect.com/api/v1/voice/synthesize" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "नमस्कार, तुम्ही कसे आहात?",
+    "language": "mr"
+  }'
+```
+
+Response:
+```json
+{
+  "audio_content": "base64_encoded_mp3_audio...",
+  "audio_format": "mp3",
+  "language": "mr"
 }
 ```
 
@@ -331,37 +425,57 @@ Response:
 
 ## Part 5: Testing
 
-### Test Google Cloud Connection
+### Test Google Cloud TTS Connection
 
 ```python
-# test_google.py
-from google.cloud import speech_v1p1beta1 as speech
+# test_google_tts.py
 from google.cloud import texttospeech
-
-# Test STT
-stt = speech.SpeechClient()
-print("✅ Speech-to-Text client connected")
 
 # Test TTS  
 tts = texttospeech.TextToSpeechClient()
 voices = tts.list_voices(language_code="hi-IN")
 print(f"✅ Text-to-Speech connected, {len(voices.voices)} Hindi voices available")
+
+# Verify female WaveNet voice exists
+for voice in voices.voices:
+    if "Wavenet-A" in voice.name:
+        print(f"✅ Found female WaveNet voice: {voice.name}")
 ```
 
-### Test AWS Connection
+### Test AWS Bedrock Connection
 
 ```python
-# test_aws.py
+# test_bedrock.py
 import boto3
+import json
 
-# Test Bedrock
+# Test Bedrock with Nova Lite
 bedrock = boto3.client('bedrock-runtime', region_name='ap-south-1')
-print("✅ Bedrock client connected")
 
-# Test DynamoDB
-dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
-table = dynamodb.Table('pragati-users')
-print(f"✅ DynamoDB connected, table status: {table.table_status}")
+# Test Nova Lite request format
+response = bedrock.invoke_model(
+    modelId='amazon.nova-lite-v1:0',
+    body=json.dumps({
+        "inferenceConfig": {"max_new_tokens": 100, "temperature": 0.7},
+        "system": [{"text": "You are a helpful assistant."}],
+        "messages": [{"role": "user", "content": [{"text": "Hello"}]}]
+    })
+)
+print("✅ Bedrock Nova Lite connected")
+```
+
+### Test with Mock OTP (Development)
+
+```bash
+# Register a test user
+curl -X POST "http://127.0.0.1:8000/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"phone_number": "+919999888877"}'
+
+# Verify with mock OTP (when OTP_MOCK_MODE=true)
+curl -X POST "http://127.0.0.1:8000/api/v1/auth/verify-otp" \
+  -H "Content-Type: application/json" \
+  -d '{"phone_number": "+919999888877", "otp": "123456"}'
 ```
 
 ---
@@ -409,19 +523,28 @@ Deploy using SAM or Serverless Framework.
 
 For 10,000 monthly active users with ~5 voice queries/day:
 
+**Using Amazon Nova Lite (Recommended):**
 | Service | Usage | Cost/Month |
 |---------|-------|------------|
-| Google STT | ~250K minutes | ~$100 |
-| Google TTS | ~50M chars | ~$200 |
-| AWS Bedrock | ~5M tokens | ~$75 |
+| Google TTS (WaveNet) | ~50M chars | ~$200 |
+| AWS Bedrock (Nova Lite) | ~5M tokens | ~$1.50 |
 | DynamoDB | ~15M requests | ~$20 |
 | S3 | 50GB storage | ~$2 |
-| **Total** | | **~$400/month** |
+| **Total** | | **~$224/month** |
 
-💡 **Optimization strategies:**
-- Use Claude Haiku for simple queries (~90% cheaper)
+**Using Claude 3 Sonnet:**
+| Service | Usage | Cost/Month |
+|---------|-------|------------|
+| Google TTS (WaveNet) | ~50M chars | ~$200 |
+| AWS Bedrock (Claude 3 Sonnet) | ~5M tokens | ~$90 |
+| DynamoDB | ~15M requests | ~$20 |
+| S3 | 50GB storage | ~$2 |
+| **Total** | | **~$312/month** |
+
+💡 **Optimization Strategies:**
+- **Use Nova Lite** - 50x cheaper than Claude with good quality for most queries
 - Cache common TTS responses in S3
-- Use Standard TTS voices instead of WaveNet
+- Consider Standard TTS voices for non-critical audio (~4x cheaper than WaveNet)
 - Implement request throttling
 
 ---
@@ -431,11 +554,11 @@ For 10,000 monthly active users with ~5 voice queries/day:
 ### Google Cloud Issues
 
 ```bash
-# Verify credentials
-gcloud auth application-default print-access-token
+# Verify credentials are set
+echo $GOOGLE_APPLICATION_CREDENTIALS
 
 # Check API enabled
-gcloud services list --enabled | grep -E "speech|texttospeech"
+gcloud services list --enabled | grep texttospeech
 ```
 
 ### AWS Issues
@@ -444,15 +567,20 @@ gcloud services list --enabled | grep -E "speech|texttospeech"
 # Verify AWS credentials
 aws sts get-caller-identity
 
-# Check Bedrock model access
+# Check Bedrock model access (list available models)
 aws bedrock list-foundation-models --region ap-south-1
+
+# Check if Nova Lite is accessible
+aws bedrock list-foundation-models --region ap-south-1 | grep -i nova
 ```
 
 ### Common Errors
 
 | Error | Solution |
 |-------|----------|
-| `GOOGLE_APPLICATION_CREDENTIALS not found` | Set env var or path in config |
-| `Bedrock model not accessible` | Request model access in AWS Console |
+| `GOOGLE_APPLICATION_CREDENTIALS not found` | Set env var: `export GOOGLE_APPLICATION_CREDENTIALS=/path/to/file.json` |
+| `Bedrock model not accessible` | Request model access in AWS Console → Bedrock → Model access |
+| `Nova model format error` | Ensure using correct request format (check `is_nova` detection) |
 | `DynamoDB table not found` | Create tables with correct names |
-| `Audio encoding not supported` | Use LINEAR16, OGG_OPUS, or FLAC |
+| `TTS voice not found` | Verify language code matches supported voices |
+| `OTP verification failed` | Set `OTP_MOCK_MODE=true` and `OTP_MOCK_CODE=123456` for testing |

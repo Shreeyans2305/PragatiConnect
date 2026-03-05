@@ -5,7 +5,7 @@ from datetime import datetime
 
 class PriceEstimateRequest(BaseModel):
     """Price estimation request metadata."""
-    language: str = Field(default="hi", pattern=r"^(en|hi|mr|ta|te|bn)$")
+    language: str = Field(default="hi", pattern=r"^(en|hi|mr|ta|te|bn|gu|pa)$")
 
 
 class MaterialAnalysis(BaseModel):
