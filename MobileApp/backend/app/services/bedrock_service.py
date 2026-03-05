@@ -146,7 +146,6 @@ class BedrockService:
                 "inferenceConfig": {
                     "maxTokens": max_tokens,
                 },
-                "system": [{"text": system_prompt}] if system_prompt else [],
                 "messages": [
                     {
                         "role": "user",
@@ -166,12 +165,14 @@ class BedrockService:
                     }
                 ],
             }
+            # Only add system field if system_prompt is provided
+            if system_prompt:
+                request_body["system"] = [{"text": system_prompt}]
         else:
             # Claude vision format
             request_body = {
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": max_tokens,
-                "system": system_prompt,
                 "messages": [
                     {
                         "role": "user",
@@ -192,6 +193,9 @@ class BedrockService:
                     }
                 ],
             }
+            # Only add system field if system_prompt is provided
+            if system_prompt:
+                request_body["system"] = system_prompt
 
         try:
             response = self.client.invoke_model(
