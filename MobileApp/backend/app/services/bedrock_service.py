@@ -41,7 +41,7 @@ class BedrockService:
         
         return {
             "inferenceConfig": {
-                "max_new_tokens": max_tokens,
+                "maxTokens": max_tokens,
                 "temperature": temperature,
             },
             "system": [{"text": system_prompt}] if system_prompt else [],
@@ -144,7 +144,7 @@ class BedrockService:
             # Nova vision format
             request_body = {
                 "inferenceConfig": {
-                    "max_new_tokens": max_tokens,
+                    "maxTokens": max_tokens,
                 },
                 "system": [{"text": system_prompt}] if system_prompt else [],
                 "messages": [

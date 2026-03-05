@@ -1,11 +1,11 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from datetime import datetime
 
 
 class UserBase(BaseModel):
     """Base user model."""
-    phone_number: str = Field(..., pattern=r"^\+91\d{10}$")
+    email: str = Field(..., description="User email address")
     name: Optional[str] = None
     primary_trade: Optional[str] = None
     secondary_trades: List[str] = []
@@ -17,7 +17,7 @@ class UserBase(BaseModel):
 
 class UserCreate(BaseModel):
     """User registration request."""
-    phone_number: str = Field(..., pattern=r"^\+91\d{10}$")
+    email: str = Field(..., description="User email address")
 
 
 class UserUpdate(BaseModel):
@@ -42,7 +42,7 @@ class UserProfile(UserBase):
 
 class OTPVerifyRequest(BaseModel):
     """OTP verification request."""
-    phone_number: str = Field(..., pattern=r"^\+91\d{10}$")
+    email: str = Field(..., description="User email address")
     otp: str = Field(..., min_length=6, max_length=6)
 
 

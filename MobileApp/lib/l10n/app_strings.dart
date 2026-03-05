@@ -30,12 +30,8 @@ class AppStrings {
       'income_uplift': 'Income Uplift',
       'awareness': 'Awareness',
 
-      // Scheme Assistant
-      'scheme_assistant': 'Scheme Assistant',
-      'ask_schemes': 'Ask about government schemes...',
-      'new_conversation': 'New conversation',
-      'demo_mode_msg':
-          'Using demo mode. Add your Gemini API key for full AI responses.',
+      // Price Estimator
+      'price_estimator': 'Price Estimator',
 
       // Schemes
       'schemes': 'Government Schemes',
@@ -99,6 +95,10 @@ class AppStrings {
       'telugu_desc': 'Interface in Telugu',
       'bengali': 'বাংলা',
       'bengali_desc': 'Interface in Bengali',
+      'gujarati': 'ગુજરાતી',
+      'gujarati_desc': 'Interface in Gujarati',
+      'punjabi': 'ਪੰਜਾਬੀ',
+      'punjabi_desc': 'Interface in Punjabi',
       'about': 'About',
       'version': 'Version',
       'ai_engine': 'AI Engine',
@@ -107,6 +107,12 @@ class AppStrings {
       'help_faq': 'Help & FAQ',
       'privacy_policy': 'Privacy Policy',
       'terms': 'Terms of Service',
+
+      // Account
+      'account': 'Account',
+      'auth_status': 'Authentication Status',
+      'logout': 'Log Out',
+      'logout_confirm': 'Are you sure you want to log out?',
 
       // Edit Profile
       'edit_profile': 'Edit Profile',
@@ -123,6 +129,16 @@ class AppStrings {
       'notifications': 'Notifications',
       'whatsapp_updates': 'WhatsApp Updates',
       'whatsapp_updates_desc': 'Receive scheme alerts and tips via WhatsApp',
+
+      // Profile Photo
+      'choose_photo': 'Choose Photo',
+      'choose_from_gallery': 'Choose from Gallery',
+      'select_existing_photo': 'Select an existing photo',
+      'use_camera': 'Take a new photo',
+      'remove_photo': 'Remove Photo',
+      'delete_current_photo': 'Delete current photo',
+      'tap_to_change_photo': 'Tap to change photo',
+      'error_picking_image': 'Error picking image',
     },
     'hi': {
       // App
@@ -149,12 +165,8 @@ class AppStrings {
       'income_uplift': 'आय वृद्धि',
       'awareness': 'जागरूकता',
 
-      // Scheme Assistant
-      'scheme_assistant': 'योजना सहायक',
-      'ask_schemes': 'सरकारी योजनाओं के बारे में पूछें...',
-      'new_conversation': 'नई बातचीत',
-      'demo_mode_msg':
-          'डेमो मोड में। पूर्ण AI प्रतिक्रियाओं के लिए अपनी Gemini API कुंजी जोड़ें।',
+      // Price Estimator
+      'price_estimator': 'कीमत अनुमानक',
 
       // Schemes
       'schemes': 'सरकारी योजनाएं',
@@ -217,6 +229,10 @@ class AppStrings {
       'telugu_desc': 'तेलुगु में इंटरफ़ेस',
       'bengali': 'বাংলা',
       'bengali_desc': 'बंगाली में इंटरफ़ेस',
+      'gujarati': 'ગુજરાતી',
+      'gujarati_desc': 'गुजराती में इंटरफ़ेस',
+      'punjabi': 'ਪੰਜਾਬੀ',
+      'punjabi_desc': 'पंजाबी में इंटरफ़ेस',
       'about': 'के बारे में',
       'version': 'संस्करण',
       'ai_engine': 'AI इंजन',
@@ -225,6 +241,12 @@ class AppStrings {
       'help_faq': 'सहायता और FAQ',
       'privacy_policy': 'गोपनीयता नीति',
       'terms': 'सेवा की शर्तें',
+
+      // Account
+      'account': 'खाता',
+      'auth_status': 'प्रमाणीकरण स्थिति',
+      'logout': 'लॉग आउट',
+      'logout_confirm': 'क्या आप वाकई लॉग आउट करना चाहते हैं?',
 
       // Edit Profile
       'edit_profile': 'प्रोफ़ाइल संपादित करें',
@@ -241,6 +263,16 @@ class AppStrings {
       'notifications': 'सूचनाएं',
       'whatsapp_updates': 'व्हाट्सएप अपडेट',
       'whatsapp_updates_desc': 'व्हाट्सएप के माध्यम से योजना अलर्ट और टिप्स प्राप्त करें',
+
+      // Profile Photo
+      'choose_photo': 'फ़ोटो चुनें',
+      'choose_from_gallery': 'गैलरी से चुनें',
+      'select_existing_photo': 'मौजूदा फ़ोटो चुनें',
+      'use_camera': 'नई फ़ोटो लें',
+      'remove_photo': 'फ़ोटो हटाएं',
+      'delete_current_photo': 'वर्तमान फ़ोटो हटाएं',
+      'tap_to_change_photo': 'फ़ोटो बदलने के लिए टैप करें',
+      'error_picking_image': 'फ़ोटो चुनने में त्रुटि',
     },
     'ta': {
       // App - Tamil
@@ -265,11 +297,8 @@ class AppStrings {
       'income_uplift': 'வருமான உயர்வு',
       'awareness': 'விழிப்புணர்வு',
 
-      // Scheme Assistant
-      'scheme_assistant': 'திட்ட உதவியாளர்',
-      'ask_schemes': 'அரசு திட்டங்கள் பற்றி கேளுங்கள்...',
-      'new_conversation': 'புதிய உரையாடல்',
-      'demo_mode_msg': 'டெமோ பயன்முறையில். முழு AI பதில்களுக்கு API கீ சேர்க்கவும்.',
+      // Price Estimator
+      'price_estimator': 'விலை மதிப்பீட்டாளர்',
 
       // Schemes
       'schemes': 'அரசு திட்டங்கள்',
@@ -330,8 +359,10 @@ class AppStrings {
       'telugu': 'తెలుగు',
       'telugu_desc': 'தெலுங்கில் இடைமுகம்',
       'bengali': 'বাংলা',
-      'bengali_desc': 'வங்காளத்தில் இடைமுகம்',
-      'about': 'பற்றி',
+      'bengali_desc': 'வங்காளத்தில் இடைமுகம்',      'gujarati': 'ગુજરાતી',
+      'gujarati_desc': 'குஜராத்தில் இடைமுகம்',
+      'punjabi': 'ਪੰਜਾਬੀ',
+      'punjabi_desc': 'பஞ்சாபில் இடைமுகம்',      'about': 'பற்றி',
       'version': 'பதிப்பு',
       'ai_engine': 'AI இயந்திரம்',
       'made_with': 'இதனால் உருவாக்கப்பட்டது',
@@ -339,6 +370,12 @@ class AppStrings {
       'help_faq': 'உதவி & FAQ',
       'privacy_policy': 'தனியுரிமைக் கொள்கை',
       'terms': 'சேவை விதிமுறைகள்',
+
+      // Account
+      'account': 'கணக்கு',
+      'auth_status': 'அங்கீகார நிலை',
+      'logout': 'வெளியேறு',
+      'logout_confirm': 'நீங்கள் நிச்சயமாக வெளியேற விரும்புகிறீர்களா?',
 
       // Edit Profile
       'edit_profile': 'சுயவிவரத்தைத் திருத்து',
@@ -444,6 +481,10 @@ class AppStrings {
       'telugu_desc': 'తెలుగులో ఇంటర్‌ఫేస్',
       'bengali': 'বাংলা',
       'bengali_desc': 'బెంగాలీలో ఇంటర్‌ఫేస్',
+      'gujarati': 'ગુજરાતી',
+      'gujarati_desc': 'గుజరాతీలో ఇంటర్‌ఫేస్',
+      'punjabi': 'ਪੰਜਾਬੀ',
+      'punjabi_desc': 'పంజాబీలో ఇంటర్‌ఫేస్',
       'about': 'గురించి',
       'version': 'వెర్షన్',
       'ai_engine': 'AI ఇంజిన్',
@@ -452,6 +493,12 @@ class AppStrings {
       'help_faq': 'సహాయం & FAQ',
       'privacy_policy': 'గోప్యతా విధానం',
       'terms': 'సేవా నిబంధనలు',
+
+      // Account
+      'account': 'ఖాతా',
+      'auth_status': 'ధృవీకరణ స్థితి',
+      'logout': 'లాగ్ అవుట్',
+      'logout_confirm': 'మీరు ఖచ్చితంగా లాగ్ అవుట్ చేయాలనుకుంటున్నారా?',
 
       // Edit Profile
       'edit_profile': 'ప్రొఫైల్ సవరించు',
@@ -557,6 +604,10 @@ class AppStrings {
       'telugu_desc': 'তেলুগুতে ইন্টারফেস',
       'bengali': 'বাংলা',
       'bengali_desc': 'বাংলায় ইন্টারফেস',
+      'gujarati': 'ગુજરાતી',
+      'gujarati_desc': 'গুজরাটিতে ইন্টারফেস',
+      'punjabi': 'ਪੰਜਾਬੀ',
+      'punjabi_desc': 'পাঞ্জাবিতে ইন্টারফেস',
       'about': 'সম্পর্কে',
       'version': 'সংস্করণ',
       'ai_engine': 'AI ইঞ্জিন',
@@ -565,6 +616,12 @@ class AppStrings {
       'help_faq': 'সাহায্য ও FAQ',
       'privacy_policy': 'গোপনীয়তা নীতি',
       'terms': 'সেবার শর্তাবলী',
+
+      // Account
+      'account': 'অ্যাকাউন্ট',
+      'auth_status': 'প্রমাণীকরণ স্থিতি',
+      'logout': 'লগ আউট',
+      'logout_confirm': 'আপনি কি নিশ্চিতভাবে লগ আউট করতে চান?',
 
       // Edit Profile
       'edit_profile': 'প্রোফাইল সম্পাদনা করুন',
@@ -669,6 +726,10 @@ class AppStrings {
       'telugu_desc': 'तेलुगूमध्ये इंटरफेस',
       'bengali': 'বাংলা',
       'bengali_desc': 'बंगालीमध्ये इंटरफेस',
+      'gujarati': 'ગુજરાતી',
+      'gujarati_desc': 'गुजरातीमध्ये इंटरफेस',
+      'punjabi': 'ਪੰਜਾਬੀ',
+      'punjabi_desc': 'पंजाबीमध्ये इंटरफेस',
       'about': 'बद्दल',
       'version': 'आवृत्ती',
       'ai_engine': 'AI इंजिन',
@@ -677,6 +738,12 @@ class AppStrings {
       'help_faq': 'मदत आणि FAQ',
       'privacy_policy': 'गोपनीयता धोरण',
       'terms': 'सेवा अटी',
+
+      // Account
+      'account': 'खाते',
+      'auth_status': 'प्रमाणीकरण स्थिती',
+      'logout': 'लॉग आउट',
+      'logout_confirm': 'तुम्हाला खात्री आहे की तुम्ही लॉग आउट करू इच्छिता?',
 
       // Edit Profile
       'edit_profile': 'प्रोफाइल संपादित करा',
@@ -693,6 +760,247 @@ class AppStrings {
       'notifications': 'सूचना',
       'whatsapp_updates': 'व्हाट्सअॅप अपडेट्स',
       'whatsapp_updates_desc': 'व्हाट्सअॅपद्वारे योजना सूचना मिळवा',
+    },
+    'gu': {
+      // App
+      'app_name': 'પ્રગતિ કનેક્ટ',
+      'welcome_back': 'પાછા આવ્યા તેનું સ્વાગત છે',
+      'empowering': "સશક્તિકરણ\nભારતના",
+      'informal_workforce': 'અનૌપચારિક\nકાર્યબળ',
+
+      // Dashboard
+      'dashboard': 'ડેશબોર્ડ',
+      'government_schemes': 'સરકારી\nયોજનાઓ',
+      'government_schemes_desc': 'તમારી પ્રોફાઇલને અનુરૂપ PM-KISAN, વીવર કલ્યાણ અને અન્ય સુરક્ષા નેટ શોધો અને અરજી કરો.',
+      'voice_assistant': 'વૉઇસ આસિસ્ટન્ટ',
+      'voice_assistant_desc': 'વેતન અને અધિકારો વિશે જવાબ મેળવવા તમારી સ્થાનિક ભાષામાં બોલો.',
+      'business_boost': 'બિઝનેસ બૂસ્ટ',
+      'business_boost_desc': 'તમારા માઇક્રો-બિઝનેસ માટે ડિજિટલ ઓળખ બનાવો.',
+      'ai_chatbot': 'AI ચેટબોટ',
+      'ai_chatbot_desc': 'AI આસિસ્ટન્ટ સાથે ચેટ કરો, ફાઇલો જોડો અને તાત્કાલિક મદદ મેળવો.',
+      'impact_metrics': 'પ્રભાવ મેટ્રિક્સ',
+      'impact_desc': 'અનૌપચારિક અર્થતંત્ર ક્ષેત્ર પર વાસ્તવિક-સમય પ્રભાવ.',
+      'income_uplift': 'આવક વૃદ્ધિ',
+      'awareness': 'જાગૃતિ',
+
+      // Price Estimator
+      'price_estimator': 'કિંમત અંદાજકાર',
+
+      // Schemes
+      'schemes': 'સરકારી યોજનાઓ',
+      'search_schemes': 'યોજનાઓ શોધો...',
+      'loading_schemes': 'યોજનાઓ લોડ કરી રહ્યા છીએ...',
+      'eligibility': 'પાત્રતા',
+      'benefits': 'લાભો',
+      'how_to_apply': 'કેવી રીતે અરજી કરવી',
+      'documents_required': 'જરૂરી દસ્તાવેજો',
+      'scheme_details': 'યોજના વિગતો',
+
+      // Voice Assistant
+      'tap_to_speak': 'બોલવા માટે ટેપ કરો',
+      'listening': 'સાંભળી રહ્યા છીએ...',
+      'thinking': 'વિચારી રહ્યા છીએ...',
+      'speaking': 'બોલી રહ્યા છીએ...',
+      'ready': 'તૈયાર',
+
+      // Business Boost
+      'boost_your_business': 'તમારા બિઝનેસને બૂસ્ટ કરો',
+      'boost_desc': 'AI નો ઉપયોગ કરીને વ્યાવસાયિક બિઝનેસ પ્રોફાઇલ અને માર્કેટિંગ સામગ્રી જનરેટ કરો.',
+      'business_name': 'બિઝનેસ નામ',
+      'business_type': 'બિઝનેસ પ્રકાર',
+      'location': 'સ્થાન',
+      'business_description': 'બિઝનેસ વર્ણન',
+      'generate_profile': 'પ્રોફાઇલ જનરેટ કરો',
+      'generating': 'જનરેટ કરી રહ્યા છીએ…',
+      'generated_profile': 'જનરેટ કરેલ પ્રોફાઇલ',
+      'copied': 'ક્લિપબોર્ડ પર કૉપિ થયું!',
+      'required_field': 'જરૂરી',
+
+      // AI Chat
+      'ai_chat': 'AI ચેટ',
+      'type_message': 'સંદેશ લખો...',
+      'attach_file': 'ફાઇલ જોડો',
+      'take_photo': 'ફોટો લો',
+      'choose_file': 'ફાઇલ પસંદ કરો',
+      'welcome_message': 'નમસ્તે! 🙏 હું તમારો AI આસિસ્ટન્ટ છું. મને કંઈપણ પૂછો — સરકારી સેવાઓ, બિઝનેસ ટિપ્સ, અથવા મદદ માટે છબીઓ અને ફાઇલો જોડો!\n\nહું આજે તમને કેવી રીતે મદદ કરી શકું?',
+      'new_chat_started_message': 'નવી ચેટ શરૂ થઈ! હું તમને કેવી રીતે મદદ કરી શકું? 🙏',
+
+      // Settings
+      'settings': 'સેટિંગ્સ',
+      'appearance': 'દેખાવ',
+      'language': 'ભાષા',
+      'light': 'લાઇટ',
+      'light_desc': 'ક્લાસિક તેજસ્વી ઇન્ટરફેસ',
+      'dark': 'ડાર્ક',
+      'dark_desc': 'આંખો પર સરળ',
+      'english': 'English',
+      'english_desc': 'અંગ્રેજીમાં ઇન્ટરફેસ',
+      'hindi': 'हिंदी',
+      'hindi_desc': 'હિન્દીમાં ઇન્ટરફેસ',
+      'marathi': 'मराठी',
+      'marathi_desc': 'મરાઠીમાં ઇન્ટરફેસ',
+      'tamil': 'தமிழ்',
+      'tamil_desc': 'તમિલમાં ઇન્ટરફેસ',
+      'telugu': 'తెలుగు',
+      'telugu_desc': 'તેલુગુમાં ઇન્ટરફેસ',
+      'bengali': 'বাংলা',
+      'bengali_desc': 'બંગાળીમાં ઇન્ટરફેસ',
+      'gujarati': 'ગુજરાતી',
+      'gujarati_desc': 'ગુજરાતીમાં ઇન્ટરફેસ',
+      'punjabi': 'ਪੰਜਾਬੀ',
+      'punjabi_desc': 'પંજાબીમાં ઇન્ટરફેસ',
+      'about': 'વિશે',
+      'version': 'સંસ્કરણ',
+      'ai_engine': 'AI એન્જિન',
+      'made_with': 'સાથે બનાવેલ',
+      'support': 'સપોર્ટ',
+      'help_faq': 'મદદ અને FAQ',
+      'privacy_policy': 'ગોપનીયતા નીતિ',
+      'terms': 'સેવાની શરતો',
+
+      // Account
+      'account': 'એકાઉન્ટ',
+      'auth_status': 'પ્રમાણીકરણ સ્થિતિ',
+      'logout': 'લૉગ આઉટ',
+      'logout_confirm': 'શું તમે ખરેખર લૉગ આઉટ કરવા માંગો છો?',
+
+      // Edit Profile
+      'edit_profile': 'પ્રોફાઇલ સંપાદિત કરો',
+      'save': 'સાચવો',
+      'profile_saved': 'પ્રોફાઇલ સફળતાપૂર્વક સાચવી!',
+      'personal_info': 'વ્યક્તિગત માહિતી',
+      'name': 'નામ',
+      'state': 'રાજ્ય',
+      'occupation': 'વ્યવસાય',
+      'primary_trade': 'પ્રાથમિક વ્યવસાય',
+      'secondary_trades': 'ગૌણ વ્યવસાય (વૈકલ્પિક)',
+      'language_preference': 'ભાષા પસંદગી',
+      'preferred_language': 'પસંદગીની ભાષા',
+      'notifications': 'સૂચનાઓ',
+      'whatsapp_updates': 'WhatsApp અપડેટ્સ',
+      'whatsapp_updates_desc': 'WhatsApp દ્વારા યોજના સૂચનાઓ મેળવો',
+    },
+    'pa': {
+      // App
+      'app_name': 'ਪ੍ਰਗਤੀ ਕਨੈਕਟ',
+      'welcome_back': 'ਵਾਪਸ ਜੀ ਆਇਆਂ ਨੂੰ',
+      'empowering': "ਸਸ਼ਕਤੀਕਰਣ\nਭਾਰਤ ਦੀ",
+      'informal_workforce': 'ਗੈਰ-ਰਸਮੀ\nਕਾਰਜ ਸ਼ਕਤੀ',
+
+      // Dashboard
+      'dashboard': 'ਡੈਸ਼ਬੋਰਡ',
+      'government_schemes': 'ਸਰਕਾਰੀ\nਯੋਜਨਾਵਾਂ',
+      'government_schemes_desc': 'ਆਪਣੇ ਪ੍ਰੋਫਾਈਲ ਲਈ ਤਿਆਰ ਕੀਤੀਆਂ PM-KISAN, ਬੁਣਕਰ ਕਲਿਆਣ, ਅਤੇ ਹੋਰ ਸੁਰੱਖਿਆ ਜਾਲ ਖੋਜੋ ਅਤੇ ਅਰਜ਼ੀ ਦਿਓ।',
+      'voice_assistant': 'ਵੌਇਸ ਅਸਿਸਟੈਂਟ',
+      'voice_assistant_desc': 'ਤਨਖਾਹ ਅਤੇ ਅਧਿਕਾਰਾਂ ਬਾਰੇ ਜਵਾਬ ਲੈਣ ਲਈ ਆਪਣੀ ਸਥਾਨਕ ਭਾਸ਼ਾ ਵਿੱਚ ਬੋਲੋ।',
+      'business_boost': 'ਬਿਜ਼ਨਸ ਬੂਸਟ',
+      'business_boost_desc': 'ਆਪਣੇ ਮਾਈਕਰੋ-ਬਿਜ਼ਨਸ ਲਈ ਇੱਕ ਡਿਜੀਟਲ ਪਛਾਣ ਬਣਾਓ।',
+      'ai_chatbot': 'AI ਚੈਟਬੋਟ',
+      'ai_chatbot_desc': 'AI ਅਸਿਸਟੈਂਟ ਨਾਲ ਗੱਲਬਾਤ ਕਰੋ, ਫਾਈਲਾਂ ਜੋੜੋ, ਅਤੇ ਤੁਰੰਤ ਮਦਦ ਪ੍ਰਾਪਤ ਕਰੋ।',
+      'impact_metrics': 'ਪ੍ਰਭਾਵ ਮੈਟ੍ਰਿਕਸ',
+      'impact_desc': 'ਗੈਰ-ਰਸਮੀ ਆਰਥਿਕਤਾ ਸੈਕਟਰ ਉੱਤੇ ਰੀਅਲ-ਟਾਈਮ ਪ੍ਰਭਾਵ।',
+      'income_uplift': 'ਆਮਦਨ ਵਾਧਾ',
+      'awareness': 'ਜਾਗਰੂਕਤਾ',
+
+      // Scheme Assistant
+      'scheme_assistant': 'ਸਕੀਮ ਅਸਿਸਟੈਂਟ',
+      'ask_schemes': 'ਸਰਕਾਰੀ ਯੋਜਨਾਵਾਂ ਬਾਰੇ ਪੁੱਛੋ...',
+      'new_conversation': 'ਨਵੀਂ ਗੱਲਬਾਤ',
+      'demo_mode_msg': 'ਡੈਮੋ ਮੋਡ ਵਰਤ ਰਹੇ ਹਾਂ। ਪੂਰੇ AI ਜਵਾਬਾਂ ਲਈ ਆਪਣੀ Gemini API ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰੋ।',
+
+      // Schemes
+      'schemes': 'ਸਰਕਾਰੀ ਯੋਜਨਾਵਾਂ',
+      'search_schemes': 'ਯੋਜਨਾਵਾਂ ਖੋਜੋ...',
+      'loading_schemes': 'ਯੋਜਨਾਵਾਂ ਲੋਡ ਕਰ ਰਹੇ ਹਾਂ...',
+      'eligibility': 'ਯੋਗਤਾ',
+      'benefits': 'ਲਾਭ',
+      'how_to_apply': 'ਅਰਜ਼ੀ ਕਿਵੇਂ ਦੇਣੀ ਹੈ',
+      'documents_required': 'ਲੋੜੀਂਦੇ ਦਸਤਾਵੇਜ਼',
+      'scheme_details': 'ਯੋਜਨਾ ਵੇਰਵੇ',
+
+      // Voice Assistant
+      'tap_to_speak': 'ਬੋਲਣ ਲਈ ਟੈਪ ਕਰੋ',
+      'listening': 'ਸੁਣ ਰਹੇ ਹਾਂ...',
+      'thinking': 'ਸੋਚ ਰਹੇ ਹਾਂ...',
+      'speaking': 'ਬੋਲ ਰਹੇ ਹਾਂ...',
+      'ready': 'ਤਿਆਰ',
+
+      // Business Boost
+      'boost_your_business': 'ਆਪਣੇ ਬਿਜ਼ਨਸ ਨੂੰ ਬੂਸਟ ਕਰੋ',
+      'boost_desc': 'AI ਦੀ ਵਰਤੋਂ ਕਰਕੇ ਪੇਸ਼ੇਵਰ ਬਿਜ਼ਨਸ ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਮਾਰਕੀਟਿੰਗ ਸਮੱਗਰੀ ਤਿਆਰ ਕਰੋ।',
+      'business_name': 'ਬਿਜ਼ਨਸ ਨਾਮ',
+      'business_type': 'ਬਿਜ਼ਨਸ ਕਿਸਮ',
+      'location': 'ਸਥਾਨ',
+      'business_description': 'ਬਿਜ਼ਨਸ ਵੇਰਵਾ',
+      'generate_profile': 'ਪ੍ਰੋਫਾਈਲ ਤਿਆਰ ਕਰੋ',
+      'generating': 'ਤਿਆਰ ਕਰ ਰਹੇ ਹਾਂ…',
+      'generated_profile': 'ਤਿਆਰ ਕੀਤਾ ਪ੍ਰੋਫਾਈਲ',
+      'copied': 'ਕਲਿੱਪਬੋਰਡ ਵਿੱਚ ਕਾਪੀ ਕੀਤਾ!',
+      'required_field': 'ਲੋੜੀਂਦਾ',
+
+      // AI Chat
+      'ai_chat': 'AI ਚੈਟ',
+      'type_message': 'ਸੰਦੇਸ਼ ਲਿਖੋ...',
+      'attach_file': 'ਫਾਈਲ ਜੋੜੋ',
+      'take_photo': 'ਫੋਟੋ ਲਓ',
+      'choose_file': 'ਫਾਈਲ ਚੁਣੋ',
+      'welcome_message': 'ਨਮਸਤੇ! 🙏 ਮੈਂ ਤੁਹਾਡਾ AI ਅਸਿਸਟੈਂਟ ਹਾਂ। ਮੈਨੂੰ ਕੁਝ ਵੀ ਪੁੱਛੋ — ਸਰਕਾਰੀ ਸੇਵਾਵਾਂ, ਬਿਜ਼ਨਸ ਟਿਪਸ, ਜਾਂ ਮਦਦ ਲਈ ਤਸਵੀਰਾਂ ਅਤੇ ਫਾਈਲਾਂ ਜੋੜੋ!\n\nਮੈਂ ਅੱਜ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?',
+      'new_chat_started_message': 'ਨਵੀਂ ਚੈਟ ਸ਼ੁਰੂ ਹੋਈ! ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ? 🙏',
+
+      // Settings
+      'settings': 'ਸੈਟਿੰਗਾਂ',
+      'appearance': 'ਦਿੱਖ',
+      'language': 'ਭਾਸ਼ਾ',
+      'light': 'ਲਾਈਟ',
+      'light_desc': 'ਕਲਾਸਿਕ ਚਮਕਦਾਰ ਇੰਟਰਫੇਸ',
+      'dark': 'ਡਾਰਕ',
+      'dark_desc': 'ਅੱਖਾਂ ਉੱਤੇ ਆਸਾਨ',
+      'english': 'English',
+      'english_desc': 'ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਇੰਟਰਫੇਸ',
+      'hindi': 'हिंदी',
+      'hindi_desc': 'ਹਿੰਦੀ ਵਿੱਚ ਇੰਟਰਫੇਸ',
+      'marathi': 'मराठी',
+      'marathi_desc': 'ਮਰਾਠੀ ਵਿੱਚ ਇੰਟਰਫੇਸ',
+      'tamil': 'தமிழ்',
+      'tamil_desc': 'ਤਮਿਲ ਵਿੱਚ ਇੰਟਰਫੇਸ',
+      'telugu': 'తెలుగు',
+      'telugu_desc': 'ਤੇਲਗੂ ਵਿੱਚ ਇੰਟਰਫੇਸ',
+      'bengali': 'বাংলা',
+      'bengali_desc': 'ਬੰਗਾਲੀ ਵਿੱਚ ਇੰਟਰਫੇਸ',
+      'gujarati': 'ગુજરાતી',
+      'gujarati_desc': 'ਗੁਜਰਾਤੀ ਵਿੱਚ ਇੰਟਰਫੇਸ',
+      'punjabi': 'ਪੰਜਾਬੀ',
+      'punjabi_desc': 'ਪੰਜਾਬੀ ਵਿੱਚ ਇੰਟਰਫੇਸ',
+      'about': 'ਬਾਰੇ',
+      'version': 'ਵਰਜਨ',
+      'ai_engine': 'AI ਇੰਜਣ',
+      'made_with': 'ਇਸ ਨਾਲ ਬਣਾਇਆ',
+      'support': 'ਸਹਾਇਤਾ',
+      'help_faq': 'ਮਦਦ ਅਤੇ FAQ',
+      'privacy_policy': 'ਗੋਪਨੀਯਤਾ ਨੀਤੀ',
+      'terms': 'ਸੇਵਾ ਦੀਆਂ ਸ਼ਰਤਾਂ',
+
+      // Account
+      'account': 'ਖਾਤਾ',
+      'auth_status': 'ਪ੍ਰਮਾਣਿਕਤਾ ਸਥਿਤੀ',
+      'logout': 'ਲਾੱਗ ਆਊਟ',
+      'logout_confirm': 'ਕੀ ਤੁਸੀਂ ਲਾੱਗ ਆਊਟ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?',
+
+      // Edit Profile
+      'edit_profile': 'ਪ੍ਰੋਫਾਈਲ ਸੰਪਾਦਿਤ ਕਰੋ',
+      'save': 'ਸੰਭਾਲੋ',
+      'profile_saved': 'ਪ੍ਰੋਫਾਈਲ ਸਫਲਤਾਪੂਰਵਕ ਸੰਭਾਲਿਆ!',
+      'personal_info': 'ਨਿੱਜੀ ਜਾਣਕਾਰੀ',
+      'name': 'ਨਾਮ',
+      'state': 'ਰਾਜ',
+      'occupation': 'ਪੇਸ਼ਾ',
+      'primary_trade': 'ਮੁੱਖ ਵਪਾਰ',
+      'secondary_trades': 'ਸੈਕੰਡਰੀ ਵਪਾਰ (ਵਿਕਲਪਿਕ)',
+      'language_preference': 'ਭਾਸ਼ਾ ਤਰਜੀਹ',
+      'preferred_language': 'ਤਰਜੀਹੀ ਭਾਸ਼ਾ',
+      'notifications': 'ਸੂਚਨਾਵਾਂ',
+      'whatsapp_updates': 'WhatsApp ਅੱਪਡੇਟਾਂ',
+      'whatsapp_updates_desc': 'WhatsApp ਦੁਆਰਾ ਯੋਜਨਾ ਸੂਚਨਾਵਾਂ ਪ੍ਰਾਪਤ ਕਰੋ',
     },
   };
 

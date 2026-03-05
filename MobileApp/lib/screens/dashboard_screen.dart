@@ -99,6 +99,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Price Estimator Card
+              _FadeSlideIn(
+                delay: 300,
+                child: _PressableCard(
+                  onTap: () => Navigator.pushNamed(context, '/price-estimator'),
+                  child: _FeatureCardContent(
+                    icon: Icons.sell_rounded,
+                    iconColor: Colors.green,
+                    iconBgColor: isDark
+                        ? Colors.green.withValues(alpha: 0.15)
+                        : const Color(0xFFE8F5E9),
+                    title: s.get('price_estimator'),
+                    description: 'Analyze products and get fair pricing',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Business Boost Card
               _FadeSlideIn(
                 delay: 350,

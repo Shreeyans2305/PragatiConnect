@@ -23,10 +23,10 @@ class DynamoDBClient:
 
     # ─── User Operations ─────────────────────────────────────────────────────
 
-    def get_user(self, phone_number: str) -> Optional[Dict[str, Any]]:
-        """Get user by phone number."""
+    def get_user(self, email: str) -> Optional[Dict[str, Any]]:
+        """Get user by email."""
         table = self.resource.Table(settings.dynamodb_table_users)
-        response = table.get_item(Key={"phone_number": phone_number})
+        response = table.get_item(Key={"email": email})
         return response.get("Item")
 
     def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -38,7 +38,7 @@ class DynamoDBClient:
         table.put_item(Item=user_data)
         return user_data
 
-    def update_user(self, phone_number: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+    def update_user(self, email: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """Update user profile."""
         table = self.resource.Table(settings.dynamodb_table_users)
         
@@ -62,7 +62,7 @@ class DynamoDBClient:
         update_expr = "SET " + ", ".join(update_expr_parts)
         
         response = table.update_item(
-            Key={"phone_number": phone_number},
+            Key={"email": email},
             UpdateExpression=update_expr,
             ExpressionAttributeNames=expr_attr_names,
             ExpressionAttributeValues=expr_attr_values,
@@ -70,32 +70,32 @@ class DynamoDBClient:
         )
         return response.get("Attributes", {})
 
-    def delete_user(self, phone_number: str) -> bool:
+    def delete_user(self, email: str) -> bool:
         """Delete user."""
         table = self.resource.Table(settings.dynamodb_table_users)
-        table.delete_item(Key={"phone_number": phone_number})
+        table.delete_item(Key={"email": email})
         return True
 
     # ─── Conversation Operations ─────────────────────────────────────────────
 
     def get_conversation(
-        self, user_phone: str, conversation_id: str
+        self, user_email: str, conversation_id: str
     ) -> Optional[Dict[str, Any]]:
         """Get conversation by ID."""
         table = self.resource.Table(settings.dynamodb_table_conversations)
         response = table.get_item(
-            Key={"user_phone": user_phone, "conversation_id": conversation_id}
+            Key={"user_email": user_email, "conversation_id": conversation_id}
         )
         return response.get("Item")
 
     def create_conversation(
-        self, user_phone: str, conversation_id: str, messages: List[Dict[str, Any]]
+        self, user_email: str, conversation_id: str, messages: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Create a new conversation."""
         table = self.resource.Table(settings.dynamodb_table_conversations)
         now = datetime.utcnow().isoformat()
         conversation = {
-            "user_phone": user_phone,
+            "user_email": user_email,
             "conversation_id": conversation_id,
             "messages": messages,
             "created_at": now,
@@ -105,13 +105,13 @@ class DynamoDBClient:
         return conversation
 
     def add_message_to_conversation(
-        self, user_phone: str, conversation_id: str, message: Dict[str, Any]
+        self, user_email: str, conversation_id: str, message: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Add a message to existing conversation."""
         table = self.resource.Table(settings.dynamodb_table_conversations)
         
         response = table.update_item(
-            Key={"user_phone": user_phone, "conversation_id": conversation_id},
+            Key={"user_email": user_email, "conversation_id": conversation_id},
             UpdateExpression="SET messages = list_append(messages, :msg), updated_at = :now",
             ExpressionAttributeValues={
                 ":msg": [message],
@@ -122,14 +122,14 @@ class DynamoDBClient:
         return response.get("Attributes", {})
 
     def get_user_conversations(
-        self, user_phone: str, limit: int = 10
+        self, user_email: str, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """Get recent conversations for a user."""
         table = self.resource.Table(settings.dynamodb_table_conversations)
         
         response = table.query(
-            KeyConditionExpression="user_phone = :phone",
-            ExpressionAttributeValues={":phone": user_phone},
+            KeyConditionExpression="user_email = :email",
+            ExpressionAttributeValues={":email": user_email},
             ScanIndexForward=False,  # Most recent first
             Limit=limit,
         )
@@ -138,13 +138,13 @@ class DynamoDBClient:
     # ─── Price Estimate Operations ───────────────────────────────────────────
 
     def create_price_estimate(
-        self, user_phone: str, estimate_id: str, estimate_data: Dict[str, Any]
+        self, user_email: str, estimate_id: str, estimate_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Create a new price estimate record."""
         table = self.resource.Table(settings.dynamodb_table_estimates)
         now = datetime.utcnow().isoformat()
         estimate = {
-            "user_phone": user_phone,
+            "user_email": user_email,
             "estimate_id": estimate_id,
             **estimate_data,
             "created_at": now,
@@ -153,26 +153,26 @@ class DynamoDBClient:
         return estimate
 
     def get_user_estimates(
-        self, user_phone: str, limit: int = 10
+        self, user_email: str, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """Get recent price estimates for a user."""
         table = self.resource.Table(settings.dynamodb_table_estimates)
         
         response = table.query(
-            KeyConditionExpression="user_phone = :phone",
-            ExpressionAttributeValues={":phone": user_phone},
+            KeyConditionExpression="user_email = :email",
+            ExpressionAttributeValues={":email": user_email},
             ScanIndexForward=False,
             Limit=limit,
         )
         return response.get("Items", [])
 
     def get_estimate(
-        self, user_phone: str, estimate_id: str
+        self, user_email: str, estimate_id: str
     ) -> Optional[Dict[str, Any]]:
         """Get specific price estimate."""
         table = self.resource.Table(settings.dynamodb_table_estimates)
         response = table.get_item(
-            Key={"user_phone": user_phone, "estimate_id": estimate_id}
+            Key={"user_email": user_email, "estimate_id": estimate_id}
         )
         return response.get("Item")
 

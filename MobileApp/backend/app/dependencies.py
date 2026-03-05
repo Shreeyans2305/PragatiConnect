@@ -30,8 +30,8 @@ async def get_current_user(
             settings.jwt_secret,
             algorithms=[settings.jwt_algorithm],
         )
-        phone_number: str = payload.get("sub")
-        if phone_number is None:
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
         
         # Check expiration
@@ -46,7 +46,7 @@ async def get_current_user(
         raise credentials_exception
     
     # Get user from database
-    user = dynamodb.get_user(phone_number)
+    user = dynamodb.get_user(email)
     if user is None:
         raise credentials_exception
     

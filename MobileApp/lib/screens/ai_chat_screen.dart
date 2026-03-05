@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,8 +8,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
 import '../services/gemini_service.dart';
+import '../services/api_service.dart';
+import '../providers/auth_provider.dart';
+import '../config/environment.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -21,8 +26,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final GeminiService _gemini = GeminiService();
+  final ApiService _apiService = ApiService();
   final List<_ChatMessage> _messages = [];
   bool _isLoading = false;
+  String? _conversationId;
 
   // Attachment state
   _Attachment? _pendingAttachment;
@@ -80,21 +87,48 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _controller.clear();
     _scrollToBottom();
 
-    // Build attachment parts
-    List<DataPart>? dataParts;
-    if (attachment != null) {
-      dataParts = [DataPart(attachment.mimeType, attachment.bytes)];
-    }
-
     final prompt = text.isNotEmpty
         ? text
         : 'Please analyze the attached file and provide helpful information about it.';
 
-    final response = await _gemini.sendAiChatMessage(
-      prompt,
-      attachments: dataParts,
-      language: _getLanguageCode(),
-    );
+    String response;
+    
+    // Check if we should use backend API
+    final useBackend = Environment.useBackendApi;
+    debugPrint('🔧 Chat: useBackendApi=$useBackend, hasAttachment=${attachment != null}');
+    
+    if (useBackend) {
+      if (attachment != null && attachment.isImage) {
+        // Use backend for image analysis
+        debugPrint('🔧 Chat: Using backend API for image analysis');
+        response = await _sendImageToBackend(prompt, attachment);
+      } else if (attachment == null) {
+        // Use backend for text-only chat
+        debugPrint('🔧 Chat: Using backend API for text chat');
+        response = await _sendToBackend(prompt);
+      } else {
+        // Use Gemini for non-image attachments (PDFs, docs)
+        debugPrint('🔧 Chat: Using Gemini for document attachment');
+        List<DataPart>? dataParts = [DataPart(attachment.mimeType, attachment.bytes)];
+        response = await _gemini.sendAiChatMessage(
+          prompt,
+          attachments: dataParts,
+          language: _getLanguageCode(),
+        );
+      }
+    } else {
+      // Use Gemini when backend is disabled
+      debugPrint('🔧 Chat: Using Gemini (backend disabled)');
+      List<DataPart>? dataParts;
+      if (attachment != null) {
+        dataParts = [DataPart(attachment.mimeType, attachment.bytes)];
+      }
+      response = await _gemini.sendAiChatMessage(
+        prompt,
+        attachments: dataParts,
+        language: _getLanguageCode(),
+      );
+    }
 
     HapticFeedback.selectionClick();
     setState(() {
@@ -102,6 +136,85 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _isLoading = false;
     });
     _scrollToBottom();
+  }
+
+  /// Send message to FastAPI backend (uses Amazon Nova)
+  Future<String> _sendToBackend(String message) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      
+      debugPrint('🔧 Chat: isAuthenticated=${authProvider.isAuthenticated}');
+      debugPrint('🔧 Chat: accessToken present=${authProvider.accessToken != null}');
+      
+      if (!authProvider.isAuthenticated) {
+        // Fallback to Gemini if not authenticated
+        debugPrint('🔧 Chat: Not authenticated, falling back to Gemini');
+        return await _gemini.sendAiChatMessage(
+          message,
+          language: _getLanguageCode(),
+        );
+      }
+
+      debugPrint('🔧 Chat: Sending to backend API...');
+      final result = await _apiService.sendChatMessage(
+        authToken: authProvider.accessToken!,
+        message: message,
+        language: _getLanguageCode(),
+        conversationId: _conversationId,
+      );
+
+      debugPrint('🔧 Chat: Backend response received');
+      _conversationId = result['conversation_id'] as String?;
+      return result['response'] as String? ?? 'No response received';
+    } catch (e) {
+      debugPrint('🔧 Chat: Backend error: $e');
+      debugPrint('🔧 Chat: Falling back to Gemini due to error');
+      // Fallback to Gemini on error
+      return await _gemini.sendAiChatMessage(
+        message,
+        language: _getLanguageCode(),
+      );
+    }
+  }
+
+  /// Send image to FastAPI backend for analysis
+  Future<String> _sendImageToBackend(String message, _Attachment attachment) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      
+      if (!authProvider.isAuthenticated) {
+        debugPrint('🔧 Chat: Not authenticated, falling back to Gemini for image');
+        return await _gemini.sendAiChatMessage(
+          message,
+          attachments: [DataPart(attachment.mimeType, attachment.bytes)],
+          language: _getLanguageCode(),
+        );
+      }
+
+      debugPrint('🔧 Chat: Sending image to backend API...');
+      final imageBase64 = base64Encode(attachment.bytes);
+      
+      final result = await _apiService.sendChatWithImage(
+        authToken: authProvider.accessToken!,
+        message: message,
+        imageBase64: imageBase64,
+        imageType: attachment.mimeType,
+        language: _getLanguageCode(),
+      );
+
+      debugPrint('🔧 Chat: Backend image analysis received');
+      _conversationId = result['conversation_id'] as String?;
+      return result['response'] as String? ?? 'No response received';
+    } catch (e) {
+      debugPrint('🔧 Chat: Backend image error: $e');
+      debugPrint('🔧 Chat: Falling back to Gemini for image analysis');
+      // Fallback to Gemini on error
+      return await _gemini.sendAiChatMessage(
+        message,
+        attachments: [DataPart(attachment.mimeType, attachment.bytes)],
+        language: _getLanguageCode(),
+      );
+    }
   }
 
   Future<void> _pickImage() async {

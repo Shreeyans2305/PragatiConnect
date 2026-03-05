@@ -176,7 +176,17 @@ class ApiService {
         request.fields.addAll(fields);
       }
 
-      request.files.add(await http.MultipartFile.fromPath(fileField, file.path));
+      // Determine MIME type from file extension
+      final extension = file.path.toLowerCase().split('.').last;
+      final mimeType = _getMimeType(extension);
+      
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          fileField,
+          file.path,
+          contentType: http.MediaType.parse(mimeType),
+        ),
+      );
 
       final streamedResponse =
           await request.send().timeout(const Duration(seconds: 60));
@@ -199,6 +209,27 @@ class ApiService {
     }
   }
 
+  /// Get MIME type based on file extension
+  String _getMimeType(String extension) {
+    final mimeTypes = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'bmp': 'image/bmp',
+      'tiff': 'image/tiff',
+      'tif': 'image/tiff',
+      'svg': 'image/svg+xml',
+      'heif': 'image/heif',
+      'heic': 'image/heic',
+      'heifs': 'image/heif-sequence',
+      'heics': 'image/heic-sequence',
+    };
+    
+    return mimeTypes[extension] ?? 'image/jpeg'; // Default to JPEG
+  }
+
   Map<String, dynamic> _handleResponse(http.Response response) {
     debugPrint('API Response [${response.statusCode}]: ${response.body.substring(0, response.body.length.clamp(0, 500))}');
 
@@ -212,15 +243,15 @@ class ApiService {
 
   // ─── Authentication Endpoints ─────────────────────────────────────────────
 
-  /// Register a new user
-  Future<Map<String, dynamic>> register(String phoneNumber) async {
-    return _post('/auth/register', body: {'phone_number': phoneNumber});
+  /// Register a new user with email
+  Future<Map<String, dynamic>> register(String email) async {
+    return _post('/auth/register', body: {'email': email});
   }
 
   /// Verify OTP and get token
-  Future<Map<String, dynamic>> verifyOtp(String phoneNumber, String otp) async {
+  Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
     return _post('/auth/verify-otp', body: {
-      'phone_number': phoneNumber,
+      'email': email,
       'otp': otp,
     });
   }
@@ -243,7 +274,15 @@ class ApiService {
     final response = await _put(
       '/profile',
       authToken: authToken,
-      body: profile.toJson(),
+      body: {
+        'name': profile.name,
+        'primary_trade': profile.primaryTrade,
+        'secondary_trades': profile.secondaryTrades,
+        'location': profile.location,
+        'state': profile.state,
+        'preferred_language': profile.preferredLanguage,
+        'whatsapp_opt_in': profile.whatsappOptIn,
+      },
     );
     return UserProfile.fromJson(response);
   }
@@ -269,15 +308,33 @@ class ApiService {
     });
   }
 
-  /// Send voice query
+  /// Send chat message with image for analysis
+  Future<Map<String, dynamic>> sendChatWithImage({
+    required String authToken,
+    required String message,
+    required String imageBase64,
+    required String imageType,
+    required String language,
+  }) async {
+    return _post('/chat/analyze-image', authToken: authToken, body: {
+      'message': message,
+      'image_base64': imageBase64,
+      'image_type': imageType,
+      'language': language,
+    });
+  }
+
+  /// Send voice query (voice-optimized chat endpoint)
   Future<Map<String, dynamic>> sendVoiceQuery({
     required String authToken,
     required String transcript,
     required String language,
+    String? conversationId,
   }) async {
-    return _post('/voice/query', authToken: authToken, body: {
+    return _post('/chat/voice-query', authToken: authToken, body: {
       'transcript': transcript,
       'language': language,
+      if (conversationId != null) 'conversation_id': conversationId,
     });
   }
 

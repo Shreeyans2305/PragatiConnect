@@ -1,7 +1,8 @@
 /// User profile model for PragatiConnect
 class UserProfile {
-  final String phoneNumber;
+  final String email;
   final String? name;
+  final String? profilePhotoPath;
   final String primaryTrade;
   final List<String> secondaryTrades;
   final String location;
@@ -12,8 +13,9 @@ class UserProfile {
   final DateTime updatedAt;
 
   UserProfile({
-    required this.phoneNumber,
+    required this.email,
     this.name,
+    this.profilePhotoPath,
     required this.primaryTrade,
     this.secondaryTrades = const [],
     required this.location,
@@ -92,8 +94,10 @@ class UserProfile {
   };
 
   UserProfile copyWith({
-    String? phoneNumber,
+    String? email,
     String? name,
+    String? profilePhotoPath,
+    bool clearProfilePhoto = false,
     String? primaryTrade,
     List<String>? secondaryTrades,
     String? location,
@@ -104,8 +108,9 @@ class UserProfile {
     DateTime? updatedAt,
   }) {
     return UserProfile(
-      phoneNumber: phoneNumber ?? this.phoneNumber,
+      email: email ?? this.email,
       name: name ?? this.name,
+      profilePhotoPath: clearProfilePhoto ? null : (profilePhotoPath ?? this.profilePhotoPath),
       primaryTrade: primaryTrade ?? this.primaryTrade,
       secondaryTrades: secondaryTrades ?? this.secondaryTrades,
       location: location ?? this.location,
@@ -119,8 +124,9 @@ class UserProfile {
 
   Map<String, dynamic> toJson() {
     return {
-      'phone_number': phoneNumber,
+      'email': email,
       'name': name,
+      'profile_photo_path': profilePhotoPath,
       'primary_trade': primaryTrade,
       'secondary_trades': secondaryTrades,
       'location': location,
@@ -134,15 +140,16 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      phoneNumber: json['phone_number'] as String,
+      email: (json['email'] ?? json['phone_number'] ?? '') as String,
       name: json['name'] as String?,
-      primaryTrade: json['primary_trade'] as String,
+      profilePhotoPath: json['profile_photo_path'] as String?,
+      primaryTrade: (json['primary_trade'] as String?) ?? '',
       secondaryTrades: (json['secondary_trades'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],
-      location: json['location'] as String,
-      state: json['state'] as String,
+      location: (json['location'] as String?) ?? '',
+      state: (json['state'] as String?) ?? '',
       preferredLanguage: json['preferred_language'] as String? ?? 'hi',
       whatsappOptIn: json['whatsapp_opt_in'] as bool? ?? false,
       createdAt: json['created_at'] != null

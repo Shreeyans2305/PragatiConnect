@@ -1,11 +1,19 @@
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
 import '../l10n/app_strings.dart';
 import '../services/gemini_service.dart';
+import '../services/voice_api_service.dart';
+import '../services/api_service.dart';
+import '../providers/auth_provider.dart';
+import '../config/environment.dart';
 
 class VoiceAssistantScreen extends StatefulWidget {
   const VoiceAssistantScreen({super.key});
@@ -21,13 +29,79 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   final stt.SpeechToText _speech = stt.SpeechToText();
   final FlutterTts _tts = FlutterTts();
   final GeminiService _gemini = GeminiService();
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   _VoiceState _state = _VoiceState.idle;
   String _recognizedText = '';
   String _responseText = '';
-  String _selectedLanguage = 'en-US';
+  String _selectedLanguage = 'en-IN';
+
+  // Language mappings for STT/TTS
+  static const Map<String, String> _languageCodes = {
+    'en': 'en-IN',
+    'hi': 'hi-IN',
+    'mr': 'mr-IN',
+    'ta': 'ta-IN',
+    'te': 'te-IN',
+    'bn': 'bn-IN',
+    'gu': 'gu-IN',
+    'pa': 'pa-IN',
+  };
+
+
+  // Available locales from device (populated on init)
+  List<stt.LocaleName> _availableLocales = [];
+  
+  // Available TTS languages
+  List<String> _availableTtsLanguages = [];
+
+  // Get short language code from full locale
+  String get _shortLangCode => _selectedLanguage.split('-').first;
   bool _speechAvailable = false;
   double _soundLevel = 0.0;
+  late String _conversationId;  // Session-based conversation ID for context persistence
+  bool _languageInitialized = false;
+
+  /// Check if a locale is available on device (matches exact or language prefix)
+  bool _isLocaleAvailable(String localeId) {
+    final langPrefix = localeId.split('-').first.toLowerCase();
+    return _availableLocales.any((l) {
+      final id = l.localeId.toLowerCase();
+      return id == localeId.toLowerCase() || id.startsWith('$langPrefix-') || id.startsWith('${langPrefix}_');
+    });
+  }
+
+  /// Get the best available locale for a target language
+  String _getBestLocale(String targetLocale) {
+    final langPrefix = targetLocale.split('-').first.toLowerCase();
+    
+    // First try exact match
+    for (final locale in _availableLocales) {
+      if (locale.localeId.toLowerCase() == targetLocale.toLowerCase()) {
+        return locale.localeId;
+      }
+    }
+    
+    // Try any variant of the language (e.g., ta-IN, ta_IN, ta)
+    for (final locale in _availableLocales) {
+      final id = locale.localeId.toLowerCase();
+      if (id.startsWith('$langPrefix-') || id.startsWith('${langPrefix}_') || id == langPrefix) {
+        return locale.localeId;
+      }
+    }
+    
+    // Fallback to Hindi, then English
+    for (final fallback in ['hi-IN', 'hi_IN', 'en-IN', 'en_IN', 'en-US']) {
+      for (final locale in _availableLocales) {
+        if (locale.localeId.toLowerCase() == fallback.toLowerCase()) {
+          return locale.localeId;
+        }
+      }
+    }
+    
+    // Last resort: use the target as-is
+    return targetLocale;
+  }
 
   /// Tracks whether the user manually tapped stop.
   /// When false, premature stops trigger an automatic restart.
@@ -36,6 +110,13 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   /// Whether we are currently in a listening session (may span
   /// multiple platform listen/restart cycles).
   bool _isInListeningSession = false;
+  
+  /// Track consecutive errors to prevent infinite restart loops
+  int _consecutiveErrors = 0;
+  static const int _maxConsecutiveErrors = 5; // Increased for non-English languages
+  
+  /// Flag to prevent concurrent restart attempts
+  bool _isRestarting = false;
 
   late AnimationController _sphereController;
   late AnimationController _pulseController;
@@ -52,6 +133,9 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   @override
   void initState() {
     super.initState();
+    // Generate unique conversation ID for this voice assistant session
+    _conversationId = _generateConversationId();
+    debugPrint('🎤 Voice assistant session ID: $_conversationId');
     _initSpeech();
     _initTts();
 
@@ -90,43 +174,155 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     );
   }
 
+  /// Generate a unique conversation ID for this voice assistant session
+  String _generateConversationId() {
+    return 'voice_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(10000)}';
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Initialize language from app locale on first build
+    if (!_languageInitialized) {
+      final locale = Localizations.localeOf(context);
+      _selectedLanguage = _languageCodes[locale.languageCode] ?? 'en-IN';
+      _languageInitialized = true;
+      debugPrint('🎤 Voice assistant language initialized to: $_selectedLanguage');
+    }
+  }
+
   Future<void> _initSpeech() async {
     _speechAvailable = await _speech.initialize(
       onError: (e) {
+        debugPrint('🎤 Speech error: ${e.errorMsg}');
         if (!mounted) return;
+        
+        _consecutiveErrors++;
+        debugPrint('🎤 Consecutive errors: $_consecutiveErrors');
+        
+        // Check for recoverable errors, but prevent infinite loops
+        // Include common transient errors that can be retried
+        final errorMsg = e.errorMsg.toLowerCase();
         final recoverable =
-            e.errorMsg == 'error_speech_timeout' ||
-            e.errorMsg == 'error_no_match';
-        if (recoverable && _isInListeningSession && !_userStoppedManually) {
+            errorMsg.contains('error_speech_timeout') ||
+            errorMsg.contains('error_no_match') ||
+            errorMsg.contains('error_listen_failed') ||
+            errorMsg.contains('error_retry') ||
+            errorMsg.contains('error_unknown') ||
+            errorMsg.contains('error_audio') ||
+            errorMsg.contains('error_network') ||
+            errorMsg.contains('error_busy') ||
+            errorMsg.contains('209'); // iOS audio session error
+        
+        if (recoverable && 
+            _isInListeningSession && 
+            !_userStoppedManually &&
+            _consecutiveErrors < _maxConsecutiveErrors) {
+          debugPrint('🎤 Recoverable error, will restart...');
           _restartListening();
           return;
         }
+        
+        // Too many errors or non-recoverable - stop completely
+        debugPrint('🎤 Stopping due to: ${_consecutiveErrors >= _maxConsecutiveErrors ? "max errors reached" : "non-recoverable error"}');
+        _isInListeningSession = false;
+        _isRestarting = false;
         setState(() {
           _state = _VoiceState.idle;
-          _isInListeningSession = false;
           _pulseController.stop();
           _aiSpeakController.stop();
         });
         _intensityController.animateTo(0);
       },
       onStatus: (status) {
+        debugPrint('🎤 Speech status: $status');
         if (!mounted) return;
+        
+        // Reset error count on successful listening status
+        if (status == 'listening') {
+          _consecutiveErrors = 0;
+          _isRestarting = false;
+        }
+        
+        // Only restart if we're not already restarting and conditions are met
         if (status == 'notListening' &&
             _isInListeningSession &&
             !_userStoppedManually &&
-            _state == _VoiceState.listening) {
+            !_isRestarting &&
+            _state == _VoiceState.listening &&
+            _consecutiveErrors < _maxConsecutiveErrors) {
+          debugPrint('🎤 Status notListening, will restart...');
           _restartListening();
         }
       },
     );
+    debugPrint('🎤 Speech available: $_speechAvailable');
+    
+    // Query available locales from device
+    if (_speechAvailable) {
+      _availableLocales = await _speech.locales();
+      debugPrint('🎤 Available locales: ${_availableLocales.map((l) => l.localeId).join(', ')}');
+      
+      // Log which of our target languages are available
+      for (final entry in _languageCodes.entries) {
+        final available = _isLocaleAvailable(entry.value);
+        debugPrint('🎤 ${entry.key} (${entry.value}): ${available ? "✓ available" : "✗ NOT available"}');
+      }
+    }
+    
     setState(() {});
   }
 
   Future<void> _initTts() async {
-    await _tts.setSharedInstance(true);
-    await _tts.setSpeechRate(0.45);
+    // Platform-specific TTS setup
+    if (Platform.isIOS) {
+      await _tts.setSharedInstance(true);
+    }
+    
+    // Set default engine for Android
+    if (Platform.isAndroid) {
+      // Get available engines and use the first one (usually Google TTS)
+      final engines = await _tts.getEngines;
+      debugPrint('🔊 Available TTS engines: $engines');
+      if (engines != null && engines.isNotEmpty) {
+        // Prefer Google TTS if available
+        final googleEngine = engines.firstWhere(
+          (e) => e.toString().toLowerCase().contains('google'),
+          orElse: () => engines.first,
+        );
+        debugPrint('🔊 Using TTS engine: $googleEngine');
+      }
+      
+      // Wait for TTS to be ready on Android
+      await _tts.awaitSpeakCompletion(true);
+    }
+    
+    await _tts.setSpeechRate(Platform.isAndroid ? 0.5 : 0.45);
     await _tts.setPitch(1.0);
+    await _tts.setVolume(1.0);
+    
+    // Query available TTS languages
+    try {
+      final languages = await _tts.getLanguages;
+      if (languages != null) {
+        _availableTtsLanguages = List<String>.from(languages);
+        debugPrint('🔊 Available TTS languages: ${_availableTtsLanguages.join(', ')}');
+        
+        // Log which of our target languages are available for TTS
+        for (final entry in _languageCodes.entries) {
+          final available = _isTtsLanguageAvailable(entry.value);
+          debugPrint('🔊 TTS ${entry.key} (${entry.value}): ${available ? "✓ available" : "✗ NOT available"}');
+        }
+      }
+      
+      // Try to set a default female voice
+      await _setPreferredFemaleVoice();
+    } catch (e) {
+      debugPrint('🔊 Error getting TTS languages: $e');
+    }
+    
     _tts.setCompletionHandler(() {
+      debugPrint('🔊 TTS completion handler called');
       if (mounted) {
         // Apple-style: fade sound level to zero first, then transition state
         setState(() {
@@ -144,6 +340,101 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
         });
       }
     });
+    
+    // Android-specific: set error handler
+    _tts.setErrorHandler((message) {
+      debugPrint('🔊 TTS error: $message');
+    });
+  }
+  
+  /// Check if a TTS language is available
+  bool _isTtsLanguageAvailable(String langCode) {
+    final langPrefix = langCode.split('-').first.toLowerCase();
+    return _availableTtsLanguages.any((l) {
+      final lLower = l.toLowerCase();
+      return lLower == langCode.toLowerCase() || 
+             lLower.startsWith('$langPrefix-') || 
+             lLower.startsWith('${langPrefix}_') ||
+             lLower == langPrefix;
+    });
+  }
+  
+  /// Get the best available TTS language for a target language
+  String _getBestTtsLanguage(String targetLang) {
+    final langPrefix = targetLang.split('-').first.toLowerCase();
+    
+    // First try exact match
+    for (final lang in _availableTtsLanguages) {
+      if (lang.toLowerCase() == targetLang.toLowerCase()) {
+        return lang;
+      }
+    }
+    
+    // Try any variant of the language
+    for (final lang in _availableTtsLanguages) {
+      final lLower = lang.toLowerCase();
+      if (lLower.startsWith('$langPrefix-') || 
+          lLower.startsWith('${langPrefix}_') || 
+          lLower == langPrefix) {
+        return lang;
+      }
+    }
+    
+    // Fallback to Hindi, then English
+    for (final fallback in ['hi-IN', 'hi_IN', 'en-IN', 'en_IN', 'en-US', 'en-GB']) {
+      for (final lang in _availableTtsLanguages) {
+        if (lang.toLowerCase() == fallback.toLowerCase()) {
+          debugPrint('🔊 TTS fallback: $targetLang -> $lang');
+          return lang;
+        }
+      }
+    }
+    
+    // Last resort
+    return targetLang;
+  }
+
+  /// Set a preferred female voice for local TTS
+  Future<void> _setPreferredFemaleVoice() async {
+    try {
+      final voices = await _tts.getVoices;
+      if (voices == null) return;
+      
+      final voiceList = List<Map<dynamic, dynamic>>.from(voices);
+      debugPrint('🔊 Available voices: ${voiceList.length}');
+      
+      // Try to find a female voice in the user's selected language
+      final langPrefix = _selectedLanguage.split('-').first.toLowerCase();
+      
+      for (final v in voiceList) {
+        final locale = v['locale']?.toString().toLowerCase() ?? '';
+        final name = v['name']?.toString().toLowerCase() ?? '';
+        final gender = v['gender']?.toString().toLowerCase() ?? '';
+        
+        if ((locale.startsWith(langPrefix) || locale.contains(langPrefix)) &&
+            (gender == 'female' || name.contains('female'))) {
+          debugPrint('🔊 Setting default female voice: ${v['name']} (${v['locale']})');
+          await _tts.setVoice({'name': v['name'], 'locale': v['locale']});
+          return;
+        }
+      }
+      
+      // Try any female voice as fallback
+      for (final v in voiceList) {
+        final name = v['name']?.toString().toLowerCase() ?? '';
+        final gender = v['gender']?.toString().toLowerCase() ?? '';
+        
+        if (gender == 'female' || name.contains('female')) {
+          debugPrint('🔊 Setting fallback female voice: ${v['name']}');
+          await _tts.setVoice({'name': v['name'], 'locale': v['locale']});
+          return;
+        }
+      }
+      
+      debugPrint('🔊 No female voice found, using default');
+    } catch (e) {
+      debugPrint('🔊 Error setting female voice: $e');
+    }
   }
 
   Future<void> _startListening() async {
@@ -155,6 +446,12 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     HapticFeedback.heavyImpact();
     _userStoppedManually = false;
     _isInListeningSession = true;
+    _consecutiveErrors = 0; // Reset error counter on new session
+    _isRestarting = false;
+    
+    // Stop any existing speech session first
+    await _speech.stop();
+    
     setState(() {
       _state = _VoiceState.listening;
       _recognizedText = '';
@@ -165,46 +462,90 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     // Smoothly ramp up sphere intensity
     _intensityController.animateTo(1.0);
 
+    // Small delay to ensure audio session is ready
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (!_isInListeningSession || !mounted) return;
+    
     await _beginListenCycle();
   }
 
   /// Core listen call extracted so it can be invoked on first start
   /// and on every automatic restart.
   Future<void> _beginListenCycle() async {
-    await _speech.listen(
-      onResult: (result) {
-        setState(() {
-          _recognizedText = result.recognizedWords;
-        });
-        if (result.finalResult && _recognizedText.isNotEmpty) {
-          _isInListeningSession = false;
-          _processVoiceInput();
-        }
-      },
-      onSoundLevelChange: (level) {
-        setState(() {
-          _soundLevel = (level + 10).clamp(0, 20) / 20;
-        });
-      },
-      localeId: _selectedLanguage,
-      listenFor: const Duration(seconds: 60),
-      pauseFor: const Duration(seconds: 5),
-    );
+    // Get the best available locale for the selected language
+    final effectiveLocale = _getBestLocale(_selectedLanguage);
+    debugPrint('🎤 Starting listen cycle, target: $_selectedLanguage, using: $effectiveLocale');
+    
+    try {
+      await _speech.listen(
+        onResult: (result) {
+          debugPrint('🎤 Result: "${result.recognizedWords}", final: ${result.finalResult}');
+          // Reset error counter on successful result
+          _consecutiveErrors = 0;
+          setState(() {
+            _recognizedText = result.recognizedWords;
+          });
+          if (result.finalResult && _recognizedText.isNotEmpty) {
+            debugPrint('🎤 Final result received, processing...');
+            _isInListeningSession = false;
+            _isRestarting = false;
+            _processVoiceInput();
+          }
+        },
+        onSoundLevelChange: (level) {
+          // Reset error counter when we're getting sound
+          if (_consecutiveErrors > 0) _consecutiveErrors = 0;
+          setState(() {
+            _soundLevel = (level + 10).clamp(0, 20) / 20;
+          });
+        },
+        localeId: effectiveLocale,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 3),
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
+      );
+      debugPrint('🎤 Listen call completed');
+    } catch (e) {
+      debugPrint('🎤 Listen exception: $e');
+      _consecutiveErrors++;
+    }
   }
 
   /// Restarts the speech recognizer seamlessly when the platform
   /// times out but the user hasn't stopped manually.
   void _restartListening() {
-    if (!_isInListeningSession || _userStoppedManually || !mounted) return;
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (!_isInListeningSession || _userStoppedManually || !mounted) return;
-      _beginListenCycle();
+    if (!_isInListeningSession || _userStoppedManually || !mounted || _isRestarting) return;
+    
+    _isRestarting = true;
+    debugPrint('🎤 Scheduling restart, attempt ${_consecutiveErrors}/$_maxConsecutiveErrors');
+    
+    // Cancel and stop current session first
+    _speech.cancel().then((_) {
+      return _speech.stop();
+    }).then((_) {
+      // Use progressively longer delay for retries (500ms, 750ms, 1000ms, etc.)
+      final delayMs = 500 + (_consecutiveErrors * 250);
+      debugPrint('🎤 Waiting ${delayMs}ms before restart...');
+      
+      Future.delayed(Duration(milliseconds: delayMs), () {
+        if (!_isInListeningSession || _userStoppedManually || !mounted) {
+          _isRestarting = false;
+          return;
+        }
+        _isRestarting = false; // Reset before starting new cycle
+        _beginListenCycle();
+      });
     });
   }
 
   Future<void> _stopListening() async {
     _userStoppedManually = true;
     _isInListeningSession = false;
+    _isRestarting = false;
+    await _speech.cancel();
     await _speech.stop();
     if (_recognizedText.isNotEmpty) {
       _processVoiceInput();
@@ -235,7 +576,84 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     HapticFeedback.selectionClick();
     setState(() => _state = _VoiceState.thinking);
 
-    final lang = _selectedLanguage.startsWith('hi') ? 'hi' : 'en';
+    final lang = _shortLangCode;
+    
+    // Check if we should use the backend API
+    if (Environment.useBackendApi) {
+      await _processWithBackend(lang);
+    } else {
+      await _processWithGemini(lang);
+    }
+  }
+
+  /// Process voice input using the FastAPI backend (Google STT/TTS + Bedrock Claude)
+  Future<void> _processWithBackend(String lang) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      
+      if (!authProvider.isAuthenticated) {
+        _showError('Please sign in to use voice assistant');
+        setState(() => _state = _VoiceState.idle);
+        _intensityController.animateTo(0);
+        return;
+      }
+
+      final voiceApi = authProvider.voiceApiService;
+      
+      // Use voice-query endpoint (voice-optimized prompts)
+      // Pass conversation ID to maintain context within this session
+      final chatResponse = await ApiService().sendVoiceQuery(
+        authToken: authProvider.accessToken!,
+        transcript: _recognizedText,
+        language: lang,
+        conversationId: _conversationId,
+      );
+
+      if (!mounted) return;
+
+      // Update conversation ID from backend response (in case it was newly created)
+      final responseConversationId = chatResponse['conversation_id'] as String?;
+      if (responseConversationId != null) {
+        _conversationId = responseConversationId;
+        debugPrint('🎤 Updated conversation ID: $_conversationId');
+      }
+
+      final aiResponse = chatResponse['response'] as String? ?? '';
+
+      setState(() {
+        _responseText = aiResponse;
+        _state = _VoiceState.speaking;
+      });
+
+      // Start AI speaking animation
+      _pulseController.repeat(reverse: true);
+      _aiSpeakController.repeat(reverse: true);
+      _intensityController.animateTo(1.0);
+
+      // Synthesize speech using backend TTS
+      debugPrint('🔊 Synthesizing speech for language: $lang, text length: ${aiResponse.length}');
+      final synthesisResult = await voiceApi.synthesize(
+        text: aiResponse,
+        language: lang,
+      );
+      debugPrint('🔊 Synthesis complete: ${synthesisResult.audioContent.length} bytes, format: ${synthesisResult.audioFormat}');
+
+      // Play the audio response
+      await _playAudioResponse(synthesisResult.audioContent, synthesisResult.audioFormat);
+      
+    } on VoiceApiException catch (e) {
+      _showError('Voice API error: ${e.message}');
+      setState(() => _state = _VoiceState.idle);
+      _intensityController.animateTo(0);
+    } catch (e) {
+      debugPrint('Backend voice error: $e');
+      // Fallback to Gemini
+      await _processWithGemini(lang);
+    }
+  }
+
+  /// Process voice input using local Gemini (fallback)
+  Future<void> _processWithGemini(String lang) async {
     final response = await _gemini.sendVoiceMessage(
       _recognizedText,
       language: lang,
@@ -253,9 +671,164 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     // Keep intensity high during speaking
     _intensityController.animateTo(1.0);
 
-    final ttsLang = _selectedLanguage.startsWith('hi') ? 'hi-IN' : 'en-US';
-    await _tts.setLanguage(ttsLang);
-    await _tts.speak(response);
+    // Try to use backend Google TTS for consistent female voice
+    try {
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.isAuthenticated) {
+        final voiceApi = authProvider.voiceApiService;
+        debugPrint('🔊 Using Google TTS (female voice) for language: $lang');
+        
+        final synthesisResult = await voiceApi.synthesize(
+          text: response,
+          language: lang,
+        );
+        
+        if (synthesisResult.audioContent.isNotEmpty && mounted) {
+          await _playAudioResponse(synthesisResult.audioContent, synthesisResult.audioFormat);
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('🔊 Backend TTS failed, falling back to local TTS: $e');
+    }
+
+    // Fallback to local TTS if backend fails
+    await _fallbackToLocalTts();
+  }
+
+  /// Play audio response from backend TTS
+  Future<void> _playAudioResponse(Uint8List audioData, String format) async {
+    debugPrint('🔊 Playing audio response: ${audioData.length} bytes, format: $format');
+    
+    // If audio data is too small, it's probably invalid
+    if (audioData.length < 100) {
+      debugPrint('🔊 Audio data too small, falling back to local TTS');
+      await _fallbackToLocalTts();
+      return;
+    }
+    
+    try {
+      // Set completion handler for audio player
+      _audioPlayer.onPlayerComplete.listen((_) {
+        debugPrint('🔊 Audio playback completed');
+        if (mounted) {
+          setState(() {
+            _soundLevel = 0;
+            _aiSpeakController.stop();
+          });
+          _intensityController.animateTo(0).then((_) {
+            if (mounted) {
+              setState(() {
+                _state = _VoiceState.idle;
+                _pulseController.stop();
+              });
+            }
+          });
+        }
+      });
+      
+      // Set error handler for audio player
+      _audioPlayer.onPlayerStateChanged.listen((state) {
+        debugPrint('🔊 Audio player state: $state');
+      });
+
+      // iOS AVPlayer requires a file with proper extension
+      // Save audio to temporary file with correct extension
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final extension = format.toLowerCase() == 'mp3' ? 'mp3' : format.toLowerCase();
+      final audioFile = File('${tempDir.path}/tts_response_$timestamp.$extension');
+      await audioFile.writeAsBytes(audioData);
+      debugPrint('🔊 Audio saved to: ${audioFile.path}');
+      
+      // Play from file (works on both iOS and Android)
+      await _audioPlayer.play(DeviceFileSource(audioFile.path));
+      debugPrint('🔊 Audio playback started');
+      
+      // Clean up old audio files in background
+      _cleanupOldAudioFiles(tempDir);
+    } catch (e) {
+      debugPrint('🔊 Audio playback error: $e');
+      await _fallbackToLocalTts();
+    }
+  }
+  
+  /// Clean up old TTS audio files to prevent cache buildup
+  void _cleanupOldAudioFiles(Directory tempDir) {
+    try {
+      final now = DateTime.now();
+      final files = tempDir.listSync().whereType<File>().where((f) {
+        return f.path.contains('tts_response_') && 
+               now.difference(f.statSync().modified).inMinutes > 5;
+      });
+      for (final file in files) {
+        file.deleteSync();
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  }
+  
+  /// Fallback to local TTS when backend audio fails
+  Future<void> _fallbackToLocalTts() async {
+    final ttsLang = _getBestTtsLanguage(_selectedLanguage);
+    debugPrint('🔊 Fallback to local TTS with language: $ttsLang');
+    
+    final setResult = await _tts.setLanguage(ttsLang);
+    debugPrint('🔊 TTS setLanguage result: $setResult');
+    
+    // On Android, setLanguage returns 1 for success, 0 for failure
+    if (setResult != 1 && Platform.isAndroid) {
+      debugPrint('🔊 Language not available, trying en-US');
+      await _tts.setLanguage('en-US');
+    }
+    
+    // Try to set female voice for local TTS
+    try {
+      final voices = await _tts.getVoices;
+      if (voices != null) {
+        final voiceList = List<Map<dynamic, dynamic>>.from(voices);
+        final langPrefix = ttsLang.split('-').first.toLowerCase();
+        
+        // Find a female voice for the current language
+        final femaleVoice = voiceList.firstWhere(
+          (v) {
+            final locale = v['locale']?.toString().toLowerCase() ?? '';
+            final name = v['name']?.toString().toLowerCase() ?? '';
+            final gender = v['gender']?.toString().toLowerCase() ?? '';
+            return (locale.startsWith(langPrefix) || locale.contains(langPrefix)) &&
+                   (gender == 'female' || name.contains('female'));
+          },
+          orElse: () => <String, dynamic>{},
+        );
+        
+        if (femaleVoice.isNotEmpty && femaleVoice['name'] != null) {
+          debugPrint('🔊 Using female voice: ${femaleVoice['name']}');
+          await _tts.setVoice({'name': femaleVoice['name'], 'locale': femaleVoice['locale']});
+        }
+      }
+    } catch (e) {
+      debugPrint('🔊 Could not set female voice: $e');
+    }
+    
+    await _tts.speak(_responseText);
+  }
+
+  void _onTtsComplete() {
+    if (mounted) {
+      setState(() {
+        _soundLevel = 0;
+        _aiSpeakController.stop();
+      });
+      _intensityController.animateTo(0).then((_) {
+        if (mounted) {
+          setState(() {
+            _state = _VoiceState.idle;
+            _pulseController.stop();
+          });
+        }
+      });
+    }
   }
 
   void _showError(String msg) {
@@ -269,11 +842,14 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   }
 
   @override
+  @override
   void dispose() {
+    debugPrint('🎤 Voice assistant session ended, clearing context: $_conversationId');
     _sphereController.dispose();
     _pulseController.dispose();
     _aiSpeakController.dispose();
     _intensityController.dispose();
+    _audioPlayer.dispose();
     _speech.stop();
     _tts.stop();
     super.dispose();
@@ -360,15 +936,14 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
             },
           ),
           actions: [
-            _LanguagePill(
-              isHindi: _selectedLanguage == 'hi-IN',
+            _LanguageSelector(
+              selectedLanguage: _selectedLanguage,
               isDark: isDark,
-              onToggle: () {
+              availableLocales: _availableLocales,
+              onLanguageChanged: (newLang) {
                 HapticFeedback.selectionClick();
                 setState(() {
-                  _selectedLanguage = _selectedLanguage == 'hi-IN'
-                      ? 'en-US'
-                      : 'hi-IN';
+                  _selectedLanguage = newLang;
                 });
               },
             ),
@@ -538,17 +1113,48 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   }
 }
 
-// ─── Language toggle pill ───────────────────────────────────────────────────
+// ─── Language selector pill ─────────────────────────────────────────────────
 
-class _LanguagePill extends StatelessWidget {
-  final bool isHindi;
+class _LanguageSelector extends StatelessWidget {
+  final String selectedLanguage;
   final bool isDark;
-  final VoidCallback onToggle;
-  const _LanguagePill({
-    required this.isHindi,
+  final ValueChanged<String> onLanguageChanged;
+  final List<stt.LocaleName> availableLocales;
+  
+  const _LanguageSelector({
+    required this.selectedLanguage,
     required this.isDark,
-    required this.onToggle,
+    required this.onLanguageChanged,
+    required this.availableLocales,
   });
+
+  static const Map<String, String> _languageLabels = {
+    'en-IN': 'EN',
+    'hi-IN': 'हिं',
+    'mr-IN': 'मरा',
+    'ta-IN': 'தமி',
+    'te-IN': 'తెలు',
+    'bn-IN': 'বাং',
+    'gu-IN': 'ગુજ',
+    'pa-IN': 'ਪੰਜ',
+  };
+
+  static const List<String> _languageOrder = [
+    'en-IN', 'hi-IN', 'mr-IN', 'ta-IN', 'te-IN', 'bn-IN', 'gu-IN', 'pa-IN'
+  ];
+
+  /// Check if a locale is available on device
+  bool _isLocaleAvailable(String localeId) {
+    if (availableLocales.isEmpty) return true; // Assume available if not loaded yet
+    final langPrefix = localeId.split('-').first.toLowerCase();
+    return availableLocales.any((l) {
+      final id = l.localeId.toLowerCase();
+      return id == localeId.toLowerCase() || 
+             id.startsWith('$langPrefix-') || 
+             id.startsWith('${langPrefix}_') ||
+             id == langPrefix;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -556,8 +1162,46 @@ class _LanguagePill extends StatelessWidget {
     final bgColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.black.withValues(alpha: 0.06);
-    return GestureDetector(
-      onTap: onToggle,
+    
+    return PopupMenuButton<String>(
+      onSelected: onLanguageChanged,
+      itemBuilder: (context) => _languageOrder.map((lang) {
+        final isSelected = lang == selectedLanguage;
+        final isAvailable = _isLocaleAvailable(lang);
+        return PopupMenuItem<String>(
+          value: lang,
+          child: Row(
+            children: [
+              if (isSelected)
+                const Icon(Icons.check, size: 16, color: Colors.green)
+              else if (!isAvailable)
+                Icon(Icons.mic_off_rounded, size: 16, color: Colors.orange.shade400)
+              else
+                const SizedBox(width: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _getFullLanguageName(lang),
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+              if (!isAvailable)
+                Tooltip(
+                  message: 'Speech input not available.\nDownload language in device settings.',
+                  child: Text(
+                    '(no mic)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.orange.shade400,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      }).toList(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -570,17 +1214,33 @@ class _LanguagePill extends StatelessWidget {
             Icon(Icons.language_rounded, size: 16, color: fgColor),
             const SizedBox(width: 4),
             Text(
-              isHindi ? 'हिंदी' : 'EN',
+              _languageLabels[selectedLanguage] ?? 'EN',
               style: TextStyle(
                 color: fgColor,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),
             ),
+            const SizedBox(width: 2),
+            Icon(Icons.arrow_drop_down, size: 16, color: fgColor),
           ],
         ),
       ),
     );
+  }
+
+  String _getFullLanguageName(String code) {
+    switch (code) {
+      case 'en-IN': return 'English';
+      case 'hi-IN': return 'हिंदी (Hindi)';
+      case 'mr-IN': return 'मराठी (Marathi)';
+      case 'ta-IN': return 'தமிழ் (Tamil)';
+      case 'te-IN': return 'తెలుగు (Telugu)';
+      case 'bn-IN': return 'বাংলা (Bengali)';
+      case 'gu-IN': return 'ગુજરાતી (Gujarati)';
+      case 'pa-IN': return 'ਪੰਜਾਬੀ (Punjabi)';
+      default: return code;
+    }
   }
 }
 

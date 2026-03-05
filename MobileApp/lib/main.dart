@@ -6,8 +6,8 @@ import 'theme.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
 import 'providers/user_provider.dart';
+import 'providers/auth_provider.dart';
 import 'screens/dashboard_screen.dart';
-import 'screens/scheme_assistant_screen.dart';
 import 'screens/voice_assistant_screen.dart';
 import 'screens/business_boost_screen.dart';
 import 'screens/settings_screen.dart';
@@ -15,6 +15,7 @@ import 'screens/schemes_screen.dart';
 import 'screens/scheme_detail_screen.dart';
 import 'screens/ai_chat_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/price_estimator_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,12 +27,18 @@ void main() async {
   final themeProvider = ThemeProvider();
   final localeProvider = LocaleProvider();
   final userProvider = UserProvider();
+  final authProvider = AuthProvider();
 
   await Future.wait([
     themeProvider.initialize(),
     localeProvider.initialize(),
     userProvider.initialize(),
+    authProvider.initialize(),
   ]);
+
+  if (Environment.useBackendApi && authProvider.isAuthenticated && authProvider.accessToken != null) {
+    await userProvider.loadProfileFromBackend(authProvider.accessToken!);
+  }
 
   runApp(
     MultiProvider(
@@ -39,6 +46,7 @@ void main() async {
         ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider.value(value: localeProvider),
         ChangeNotifierProvider.value(value: userProvider),
+        ChangeNotifierProvider.value(value: authProvider),
       ],
       child: const PragatiConnectApp(),
     ),
@@ -78,7 +86,7 @@ class PragatiConnectApp extends StatelessWidget {
               : const OnboardingScreen(),
           '/dashboard': (_) => const DashboardScreen(),
           '/onboarding': (_) => const OnboardingScreen(),
-          '/scheme-assistant': (_) => const SchemeAssistantScreen(),
+          '/price-estimator': (_) => const PriceEstimatorScreen(),
           '/voice-assistant': (_) => const VoiceAssistantScreen(),
           '/business-boost': (_) => const BusinessBoostScreen(),
           '/settings': (_) => const SettingsScreen(),

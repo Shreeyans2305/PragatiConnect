@@ -70,5 +70,9 @@
 	<string>PragatiConnect needs microphone access to listen to your voice commands and questions.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>PragatiConnect uses speech recognition to understand your voice queries in Hindi, English, and other Indian languages.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PragatiConnect needs access to your photo library to let you choose a profile picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PragatiConnect needs camera access to let you take a profile picture.</string>
 </dict>
 </plist>

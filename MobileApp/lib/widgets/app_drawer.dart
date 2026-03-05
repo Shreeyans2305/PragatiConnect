@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -109,10 +110,10 @@ class AppDrawer extends StatelessWidget {
               onTap: () => _navigate(context, '/voice-assistant'),
             ),
             _NavItem(
-              icon: Icons.verified_user_rounded,
-              label: s.get('scheme_assistant'),
+              icon: Icons.sell_rounded,
+              label: s.get('price_estimator'),
               isSelected: currentIndex == 4,
-              onTap: () => _navigate(context, '/scheme-assistant'),
+              onTap: () => _navigate(context, '/price-estimator'),
             ),
             _NavItem(
               icon: Icons.store_rounded,
@@ -175,6 +176,9 @@ class AppDrawer extends StatelessWidget {
     final localeProvider = context.watch<LocaleProvider>();
     final isHindi = localeProvider.isHindi;
 
+    final hasPhoto = profile.profilePhotoPath != null && 
+        File(profile.profilePhotoPath!).existsSync();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       child: Row(
@@ -183,17 +187,25 @@ class AppDrawer extends StatelessWidget {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: hasPhoto ? null : LinearGradient(
                 colors: [primaryColor, AppColors.secondary],
               ),
               borderRadius: BorderRadius.circular(14),
+              image: hasPhoto
+                  ? DecorationImage(
+                      image: FileImage(File(profile.profilePhotoPath!)),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
             ),
-            child: Center(
-              child: Text(
-                profile.tradeIcon,
-                style: const TextStyle(fontSize: 24),
-              ),
-            ),
+            child: hasPhoto
+                ? null
+                : Center(
+                    child: Text(
+                      profile.tradeIcon,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(

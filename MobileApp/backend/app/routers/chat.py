@@ -69,11 +69,11 @@ async def send_message(
     current_user: dict = Depends(get_current_user),
 ):
     """Send a chat message and get AI response."""
-    phone = current_user["phone_number"]
+    email = current_user["email"]
     conversation_id = request.conversation_id or str(uuid.uuid4())
     
     # Get or create conversation
-    conversation = dynamodb.get_conversation(phone, conversation_id)
+    conversation = dynamodb.get_conversation(email, conversation_id)
     history = conversation.get("messages", []) if conversation else []
     
     # Build system prompt with user context
@@ -105,11 +105,11 @@ async def send_message(
     }
     
     if conversation:
-        dynamodb.add_message_to_conversation(phone, conversation_id, user_message)
-        dynamodb.add_message_to_conversation(phone, conversation_id, assistant_message)
+        dynamodb.add_message_to_conversation(email, conversation_id, user_message)
+        dynamodb.add_message_to_conversation(email, conversation_id, assistant_message)
     else:
         dynamodb.create_conversation(
-            phone, conversation_id, [user_message, assistant_message]
+            email, conversation_id, [user_message, assistant_message]
         )
     
     return ChatResponse(
@@ -125,8 +125,8 @@ async def get_history(
     limit: int = 10,
 ):
     """Get user's conversation history."""
-    phone = current_user["phone_number"]
-    conversations = dynamodb.get_user_conversations(phone, limit)
+    email = current_user["email"]
+    conversations = dynamodb.get_user_conversations(email, limit)
     
     return {
         "conversations": [
@@ -164,11 +164,11 @@ async def voice_query(
     If conversation_id is provided, loads history and maintains context.
     Otherwise creates new conversation.
     """
-    phone = current_user["phone_number"]
+    email = current_user["email"]
     conv_id = request.conversation_id or str(uuid.uuid4())
     
     # Load conversation history if exists
-    conversation = dynamodb.get_conversation(phone, conv_id)
+    conversation = dynamodb.get_conversation(email, conv_id)
     history = conversation.get("messages", []) if conversation else []
     
     # Build system prompt with user context
@@ -209,10 +209,10 @@ async def voice_query(
     }
     
     if conversation:
-        dynamodb.add_message_to_conversation(phone, conv_id, user_message)
-        dynamodb.add_message_to_conversation(phone, conv_id, assistant_message)
+        dynamodb.add_message_to_conversation(email, conv_id, user_message)
+        dynamodb.add_message_to_conversation(email, conv_id, assistant_message)
     else:
-        dynamodb.create_conversation(phone, conv_id, [user_message, assistant_message])
+        dynamodb.create_conversation(email, conv_id, [user_message, assistant_message])
     
     return VoiceQueryResponse(
         response=response_text,

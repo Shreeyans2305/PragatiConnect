@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../l10n/app_strings.dart';
+import '../services/api_service.dart';
 import '../services/gemini_service.dart';
+import '../providers/auth_provider.dart';
+import '../config/environment.dart';
 import 'scheme_detail_screen.dart';
 
 class SchemesScreen extends StatefulWidget {
@@ -14,6 +18,7 @@ class SchemesScreen extends StatefulWidget {
 
 class _SchemesScreenState extends State<SchemesScreen> {
   final GeminiService _gemini = GeminiService();
+  final ApiService _apiService = ApiService();
   List<Map<String, dynamic>> _schemes = [];
   List<Map<String, dynamic>> _filtered = [];
   bool _loading = true;
@@ -30,9 +35,37 @@ class _SchemesScreenState extends State<SchemesScreen> {
 
   Future<void> _loadSchemes() async {
     setState(() => _loading = true);
-    final schemes = await _gemini.fetchGovernmentSchemes(
-      language: _currentLang,
-    );
+    
+    List<Map<String, dynamic>> schemes;
+    
+    // Check if we should use backend API
+    final useBackend = Environment.useBackendApi;
+    final authProvider = context.read<AuthProvider>();
+    
+    debugPrint('🔧 Schemes: useBackend=$useBackend, isAuthenticated=${authProvider.isAuthenticated}');
+    
+    if (useBackend && authProvider.isAuthenticated) {
+      // Use backend API
+      try {
+        debugPrint('🔧 Schemes: Using backend API');
+        schemes = await _apiService.getSchemes(
+          authToken: authProvider.accessToken!,
+        );
+        debugPrint('🔧 Schemes: Got ${schemes.length} schemes from backend');
+      } catch (e) {
+        debugPrint('Backend schemes error: $e, falling back to Gemini');
+        schemes = await _gemini.fetchGovernmentSchemes(
+          language: _currentLang,
+        );
+      }
+    } else {
+      // Fallback to Gemini
+      debugPrint('🔧 Schemes: Using Gemini (backend disabled or not authenticated)');
+      schemes = await _gemini.fetchGovernmentSchemes(
+        language: _currentLang,
+      );
+    }
+    
     setState(() {
       _schemes = schemes;
       _filtered = schemes;

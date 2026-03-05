@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../widgets/app_drawer.dart';
 import '../services/gemini_service.dart';
+import '../services/api_service.dart';
+import '../providers/auth_provider.dart';
+import '../config/environment.dart';
 
 class BusinessBoostScreen extends StatefulWidget {
   const BusinessBoostScreen({super.key});
@@ -20,6 +24,7 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
   final _locationController = TextEditingController();
   final _descController = TextEditingController();
   final _gemini = GeminiService();
+  final _apiService = ApiService();
   String? _generatedProfile;
   bool _isLoading = false;
 
@@ -68,12 +73,19 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
     });
     _resultController.reset();
 
-    final result = await _gemini.generateBusinessProfile(
-      businessName: _nameController.text.trim(),
-      businessType: _typeController.text.trim(),
-      location: _locationController.text.trim(),
-      description: _descController.text.trim(),
-    );
+    String result;
+    
+    // Use backend API (Amazon Nova) when available
+    if (Environment.useBackendApi) {
+      result = await _generateWithBackend();
+    } else {
+      result = await _gemini.generateBusinessProfile(
+        businessName: _nameController.text.trim(),
+        businessType: _typeController.text.trim(),
+        location: _locationController.text.trim(),
+        description: _descController.text.trim(),
+      );
+    }
 
     HapticFeedback.lightImpact();
     setState(() {
@@ -81,6 +93,51 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
       _isLoading = false;
     });
     _resultController.forward();
+  }
+
+  /// Generate business profile using backend API (Amazon Nova)
+  Future<String> _generateWithBackend() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      
+      if (!authProvider.isAuthenticated) {
+        debugPrint('💼 Business: Not authenticated, using Gemini fallback');
+        return await _gemini.generateBusinessProfile(
+          businessName: _nameController.text.trim(),
+          businessType: _typeController.text.trim(),
+          location: _locationController.text.trim(),
+          description: _descController.text.trim(),
+        );
+      }
+
+      final locale = Localizations.localeOf(context);
+      final langCode = locale.languageCode;
+
+      debugPrint('💼 Business: Using backend API with language: $langCode');
+      
+      final response = await _apiService.generateBusinessProfile(
+        authToken: authProvider.accessToken!,
+        businessDetails: {
+          'business_name': _nameController.text.trim(),
+          'trade': _typeController.text.trim(),
+          'experience_years': 5, // Default
+          'specialties': _descController.text.trim(),
+          'target_customers': _locationController.text.trim(),
+        },
+        language: langCode,
+      );
+
+      return response['content'] as String? ?? 'Could not generate profile.';
+    } catch (e) {
+      debugPrint('💼 Business: Backend error: $e, using Gemini fallback');
+      // Fallback to Gemini
+      return await _gemini.generateBusinessProfile(
+        businessName: _nameController.text.trim(),
+        businessType: _typeController.text.trim(),
+        location: _locationController.text.trim(),
+        description: _descController.text.trim(),
+      );
+    }
   }
 
   void _copyToClipboard() {

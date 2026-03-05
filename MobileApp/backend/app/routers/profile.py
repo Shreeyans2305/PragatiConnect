@@ -19,7 +19,7 @@ async def update_profile(
     current_user: dict = Depends(get_current_user),
 ):
     """Update current user's profile."""
-    phone_number = current_user["phone_number"]
+    email = current_user["email"]
     
     # Filter out None values
     update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
@@ -27,13 +27,13 @@ async def update_profile(
     if not update_data:
         return UserProfile(**current_user)
     
-    updated_user = dynamodb.update_user(phone_number, update_data)
+    updated_user = dynamodb.update_user(email, update_data)
     return UserProfile(**updated_user)
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_profile(current_user: dict = Depends(get_current_user)):
     """Delete current user's account."""
-    phone_number = current_user["phone_number"]
-    dynamodb.delete_user(phone_number)
+    email = current_user["email"]
+    dynamodb.delete_user(email)
     return None

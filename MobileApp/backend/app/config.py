@@ -1,10 +1,19 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from functools import lru_cache
 from typing import List
+from pathlib import Path
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
+
+    _env_path = Path(__file__).resolve().parents[1] / ".env"
+    model_config = ConfigDict(
+        env_file=str(_env_path),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # AWS Configuration
     aws_region: str = "ap-south-1"
@@ -42,6 +51,11 @@ class Settings(BaseSettings):
     otp_mock_mode: bool = True
     otp_mock_code: str = "123456"
 
+    # Email Configuration (Gmail SMTP)
+    gmail_address: str = ""  # Your Gmail address (e.g., your-email@gmail.com)
+    gmail_app_password: str = ""  # Your Gmail App Password (16-character password)
+    email_mock_mode: bool = False  # Set to True to skip actual email sending
+
     # App Configuration
     debug: bool = True
     cors_origins: str = "http://localhost:3000,http://localhost:8080"
@@ -49,10 +63,6 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 @lru_cache()

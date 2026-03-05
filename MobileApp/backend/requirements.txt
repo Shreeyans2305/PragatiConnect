@@ -8,6 +8,7 @@ python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 httpx>=0.26.0
 Pillow>=11.0.0
+pillow-heif>=0.7.0
 langdetect>=1.0.9
 mangum>=0.17.0
 pytest>=7.4.4

@@ -21,6 +21,8 @@ class LocaleProvider extends ChangeNotifier {
     Locale('ta'),
     Locale('te'),
     Locale('bn'),
+    Locale('gu'),
+    Locale('pa'),
   ];
 
   /// Initialize from SharedPreferences

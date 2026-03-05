@@ -58,7 +58,7 @@ async def voice_query(
     
     Returns both text and audio response.
     """
-    phone = current_user["phone_number"]
+    email = current_user["email"]
     conv_id = conversation_id or str(uuid.uuid4())
 
     try:
@@ -91,7 +91,7 @@ async def voice_query(
 
         # ===== Step 2: AI Response (Bedrock) =====
         # Get conversation history
-        conversation = dynamodb.get_conversation(phone, conv_id)
+        conversation = dynamodb.get_conversation(email, conv_id)
         history = conversation.get("messages", []) if conversation else []
 
         # Build system prompt with user context
@@ -133,10 +133,10 @@ async def voice_query(
         }
 
         if conversation:
-            dynamodb.add_message_to_conversation(phone, conv_id, user_message)
-            dynamodb.add_message_to_conversation(phone, conv_id, assistant_message)
+            dynamodb.add_message_to_conversation(email, conv_id, user_message)
+            dynamodb.add_message_to_conversation(email, conv_id, assistant_message)
         else:
-            dynamodb.create_conversation(phone, conv_id, [user_message, assistant_message])
+            dynamodb.create_conversation(email, conv_id, [user_message, assistant_message])
 
         return VoiceQueryResponse(
             user_transcript=user_text,
@@ -167,7 +167,7 @@ async def voice_query_base64(
     Voice query with base64 encoded audio (for mobile apps).
     Same pipeline as /query but accepts JSON with base64 audio.
     """
-    phone = current_user["phone_number"]
+    email = current_user["email"]
     conv_id = request.conversation_id or str(uuid.uuid4())
 
     try:
@@ -191,7 +191,7 @@ async def voice_query_base64(
             )
 
         # ===== Step 2: AI Response =====
-        conversation = dynamodb.get_conversation(phone, conv_id)
+        conversation = dynamodb.get_conversation(email, conv_id)
         history = conversation.get("messages", []) if conversation else []
 
         system_prompt = VOICE_ASSISTANT_PROMPT.format(
@@ -229,10 +229,10 @@ async def voice_query_base64(
         }
 
         if conversation:
-            dynamodb.add_message_to_conversation(phone, conv_id, user_message)
-            dynamodb.add_message_to_conversation(phone, conv_id, assistant_message)
+            dynamodb.add_message_to_conversation(email, conv_id, user_message)
+            dynamodb.add_message_to_conversation(email, conv_id, assistant_message)
         else:
-            dynamodb.create_conversation(phone, conv_id, [user_message, assistant_message])
+            dynamodb.create_conversation(email, conv_id, [user_message, assistant_message])
 
         return VoiceQueryResponse(
             user_transcript=user_text,

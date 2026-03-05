@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/auth_provider.dart';
 import '../l10n/app_strings.dart';
 import 'edit_profile_screen.dart';
 
@@ -64,19 +66,30 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                        child: Text(
-                          (userProvider.profile?.name?.isNotEmpty == true)
-                              ? userProvider.profile!.name![0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final photoPath = userProvider.profile?.profilePhotoPath;
+                          final hasValidPhoto = photoPath != null && File(photoPath).existsSync();
+                          return CircleAvatar(
+                            radius: 28,
+                            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                            backgroundImage: hasValidPhoto
+                                ? FileImage(File(photoPath))
+                                : null,
+                            child: !hasValidPhoto
+                                ? Text(
+                                    (userProvider.profile?.name?.isNotEmpty == true)
+                                        ? userProvider.profile!.name![0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  )
+                                : null,
+                          );
+                        },
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -244,6 +257,32 @@ class SettingsScreen extends StatelessWidget {
                       localeProvider.setLocale(const Locale('bn'));
                     },
                   ),
+                  Divider(height: 1, indent: 60, color: borderColor),
+                  _OptionTile(
+                    icon: Icons.translate_rounded,
+                    iconColor: const Color(0xFFEC4899),
+                    title: s.get('gujarati'),
+                    subtitle: s.get('gujarati_desc'),
+                    isSelected: localeProvider.languageCode == 'gu',
+                    isDark: isDark,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      localeProvider.setLocale(const Locale('gu'));
+                    },
+                  ),
+                  Divider(height: 1, indent: 60, color: borderColor),
+                  _OptionTile(
+                    icon: Icons.translate_rounded,
+                    iconColor: const Color(0xFF06B6D4),
+                    title: s.get('punjabi'),
+                    subtitle: s.get('punjabi_desc'),
+                    isSelected: localeProvider.languageCode == 'pa',
+                    isDark: isDark,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      localeProvider.setLocale(const Locale('pa'));
+                    },
+                  ),
                 ],
               ),
             ),
@@ -328,6 +367,57 @@ class SettingsScreen extends StatelessWidget {
                     title: s.get('terms'),
                     isDark: isDark,
                     onTap: () => HapticFeedback.lightImpact(),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Section: Account
+            _SectionHeader(title: s.get('account'), isDark: isDark),
+            const SizedBox(height: 12),
+
+            Container(
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                children: [
+                  // Show auth status
+                  Builder(
+                    builder: (context) {
+                      final authProvider = context.watch<AuthProvider>();
+                      return _InfoTile(
+                        icon: authProvider.isAuthenticated 
+                            ? Icons.verified_user_rounded 
+                            : Icons.person_off_rounded,
+                        title: s.get('auth_status'),
+                        trailing: Text(
+                          authProvider.isAuthenticated 
+                              ? (localeProvider.languageCode == 'hi' ? 'लॉग इन' : 'Logged In')
+                              : (localeProvider.languageCode == 'hi' ? 'लॉग आउट' : 'Not Logged In'),
+                          style: TextStyle(
+                            color: authProvider.isAuthenticated 
+                                ? Colors.green 
+                                : subtitleColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        isDark: isDark,
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 60, color: borderColor),
+                  _ActionTile(
+                    icon: Icons.logout_rounded,
+                    title: s.get('logout'),
+                    isDark: isDark,
+                    isDestructive: true,
+                    onTap: () => _showLogoutConfirmation(context, s, localeProvider),
                   ),
                 ],
               ),
@@ -545,6 +635,56 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
+// ─── Logout confirmation dialog ──────────────────────────────────────────────
+
+void _showLogoutConfirmation(BuildContext context, S s, LocaleProvider localeProvider) {
+  HapticFeedback.lightImpact();
+  final isHindi = localeProvider.languageCode == 'hi';
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(isHindi ? 'लॉग आउट करें?' : 'Log Out?'),
+      content: Text(
+        isHindi 
+            ? 'आप लॉग आउट हो जाएंगे और ऑनबोर्डिंग पर वापस जाएंगे। क्या आप जारी रखना चाहते हैं?'
+            : 'You will be logged out and taken back to onboarding. Do you want to continue?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(isHindi ? 'रद्द करें' : 'Cancel'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            
+            // Clear auth state
+            final authProvider = context.read<AuthProvider>();
+            await authProvider.logout();
+            
+            // Clear user profile
+            final userProvider = context.read<UserProvider>();
+            await userProvider.clearProfile();
+            
+            // Navigate to onboarding
+            if (context.mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/onboarding',
+                (route) => false,
+              );
+            }
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.red,
+          ),
+          child: Text(isHindi ? 'लॉग आउट' : 'Log Out'),
+        ),
+      ],
+    ),
+  );
+}
+
 // ─── Action tile ─────────────────────────────────────────────────────────────
 
 class _ActionTile extends StatefulWidget {
@@ -552,12 +692,14 @@ class _ActionTile extends StatefulWidget {
   final String title;
   final bool isDark;
   final VoidCallback onTap;
+  final bool isDestructive;
 
   const _ActionTile({
     required this.icon,
     required this.title,
     required this.isDark,
     required this.onTap,
+    this.isDestructive = false,
   });
 
   @override
@@ -569,6 +711,13 @@ class _ActionTileState extends State<_ActionTile> {
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = widget.isDestructive 
+        ? Colors.red 
+        : (widget.isDark ? const Color(0xFF6AAFD4) : const Color(0xFF355872));
+    final textColor = widget.isDestructive 
+        ? Colors.red 
+        : (widget.isDark ? Colors.white : Colors.black);
+    
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) {
@@ -591,18 +740,12 @@ class _ActionTileState extends State<_ActionTile> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color:
-                    (widget.isDark
-                            ? const Color(0xFF6AAFD4)
-                            : const Color(0xFF355872))
-                        .withValues(alpha: 0.12),
+                color: iconColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 widget.icon,
-                color: widget.isDark
-                    ? const Color(0xFF6AAFD4)
-                    : const Color(0xFF355872),
+                color: iconColor,
                 size: 20,
               ),
             ),
@@ -611,7 +754,7 @@ class _ActionTileState extends State<_ActionTile> {
               child: Text(
                 widget.title,
                 style: TextStyle(
-                  color: widget.isDark ? Colors.white : Colors.black,
+                  color: textColor,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),

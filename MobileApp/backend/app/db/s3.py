@@ -19,15 +19,22 @@ class S3Client:
     def upload_image(
         self,
         image_bytes: bytes,
-        user_phone: str,
+        user_identifier: str,
         content_type: str = "image/jpeg",
     ) -> str:
         """Upload image and return the S3 key."""
         # Generate unique key
         image_id = str(uuid.uuid4())
-        # Sanitize phone number for path
-        phone_safe = user_phone.replace("+", "").replace(" ", "")
-        key = f"images/{phone_safe}/{image_id}.jpg"
+        # Sanitize identifier (email / phone) for path
+        safe_identifier = (
+            user_identifier
+            .replace("+", "")
+            .replace("@", "_")
+            .replace(".", "_")
+            .replace(" ", "")
+            .replace("/", "_")
+        )
+        key = f"images/{safe_identifier}/{image_id}.jpg"
 
         self.client.put_object(
             Bucket=self.bucket,
