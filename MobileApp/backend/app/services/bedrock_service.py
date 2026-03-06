@@ -104,6 +104,11 @@ class BedrockService:
         else:
             request_body = self._build_claude_request(messages, system_prompt, max_tokens, temperature)
 
+        # Log system prompt for debugging language issues
+        print(f"[BEDROCK] Model: {self.model_id}")
+        print(f"[BEDROCK] System prompt (first 300 chars): {system_prompt[:300]}...")
+        print(f"[BEDROCK] User prompt: {prompt[:100]}...")
+
         try:
             response = self.client.invoke_model(
                 modelId=self.model_id,
@@ -116,9 +121,12 @@ class BedrockService:
             
             # Parse response based on model type
             if self.is_nova:
-                return self._parse_nova_response(response_body)
+                result = self._parse_nova_response(response_body)
             else:
-                return self._parse_claude_response(response_body)
+                result = self._parse_claude_response(response_body)
+            
+            print(f"[BEDROCK] Response (first 150 chars): {result[:150]}...")
+            return result
         
         except Exception as e:
             print(f"Bedrock error: {e}")

@@ -90,18 +90,17 @@ class SpeechService:
         # Map to Google Cloud language code
         gc_language_code = self.LANGUAGE_CODES.get(language_code, "hi-IN")
 
+        print(f"[STT] Transcribing audio: language={language_code} -> {gc_language_code}")
+
         # Configure recognition
         config = speech.RecognitionConfig(
             encoding=getattr(speech.RecognitionConfig.AudioEncoding, encoding),
             sample_rate_hertz=sample_rate_hertz,
             language_code=gc_language_code,
             enable_automatic_punctuation=enable_automatic_punctuation,
-            model="latest_long",  # Best for long-form audio
+            # Use default model for better Indian language support
+            # latest_long can be less accurate for some Indian languages
             use_enhanced=True,    # Enhanced model for better accuracy
-            # Alternative languages for multilingual speakers
-            alternative_language_codes=[
-                self.LANGUAGE_CODES.get("en", "en-IN"),
-            ] if language_code != "en" else [],
         )
 
         audio = speech.RecognitionAudio(content=audio_data)
@@ -119,6 +118,8 @@ class SpeechService:
             # Get best result
             best_result = response.results[0]
             best_alternative = best_result.alternatives[0]
+
+            print(f"[STT] Transcription result: {best_alternative.transcript[:100]}... (confidence: {best_alternative.confidence})")
 
             return {
                 "transcript": best_alternative.transcript,
@@ -263,7 +264,11 @@ class SpeechService:
             }
 
         except Exception as e:
-            print(f"TTS Error: {e}")
+            print(f"[TTS] Google Cloud TTS Error: {str(e)}")
+            print(f"[TTS] Language: {language_code}, Voice: {voice_name}")
+            print(f"[TTS] Text length: {len(text)}")
+            import traceback
+            traceback.print_exc()
             raise
 
     async def synthesize_ssml(

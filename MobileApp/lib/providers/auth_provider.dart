@@ -75,7 +75,16 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _apiService.register(email);
+      final response = await _apiService.register(email);
+      final emailSent = response['email_sent'] as bool?;
+      if (emailSent == false) {
+        _errorMessage = 'Verification email could not be sent. Please try again.';
+        _state = AuthState.error;
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
       _email = email;
       _state = AuthState.awaitingOtp;
       _isLoading = false;

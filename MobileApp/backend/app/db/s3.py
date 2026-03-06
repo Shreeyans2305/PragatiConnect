@@ -8,11 +8,17 @@ class S3Client:
     """Client for S3 operations."""
 
     def __init__(self):
-        self.client = boto3.client(
+        import boto3 as _boto3
+        region = settings.aws_s3_region
+        self.client = _boto3.client(
             "s3",
-            region_name=settings.aws_region,
+            region_name=region,
             aws_access_key_id=settings.aws_access_key_id,
             aws_secret_access_key=settings.aws_secret_access_key,
+            config=_boto3.session.Config(
+                s3={"addressing_style": "virtual"},
+                signature_version="s3v4",
+            ),
         )
         self.bucket = settings.s3_bucket_images
 

@@ -39,6 +39,10 @@ def get_language_name(code: str) -> str:
         "te": "Telugu",
         "bn": "Bengali",
         "mr": "Marathi",
+        "gu": "Gujarati",
+        "kn": "Kannada",
+        "ml": "Malayalam",
+        "pa": "Punjabi",
     }
     return languages.get(code, "Hindi")
 
@@ -95,21 +99,30 @@ async def voice_query(
         history = conversation.get("messages", []) if conversation else []
 
         # Build system prompt with user context
+        language_name = get_language_name(language)
         system_prompt = VOICE_ASSISTANT_PROMPT.format(
             user_name=current_user.get("name", "User"),
             user_trade=current_user.get("primary_trade", "worker"),
             user_location=current_user.get("location", "India"),
             user_state=current_user.get("state", ""),
-            language=get_language_name(language),
+            language=language_name,
         )
+
+        print(f"[VOICE] Language: {language} ({language_name}), User text: {user_text[:50]}...")
+
+        # Add language reminder to user prompt
+        enhanced_prompt = f"[User language: {language_name}] {user_text}"
 
         # Get AI response from Bedrock
         ai_response = await bedrock_service.generate_response(
-            prompt=user_text,
+            prompt=enhanced_prompt,
             system_prompt=system_prompt,
             conversation_history=history[-10:],
             temperature=0.7,
         )
+        
+        print(f"[VOICE] AI response (first 100 chars): {ai_response[:100]}...")
+        print(f"[VOICE] Response length: {len(ai_response)} chars")
 
         # ===== Step 3: Text-to-Speech =====
         tts_result = await speech_service.synthesize_speech(
@@ -194,19 +207,28 @@ async def voice_query_base64(
         conversation = dynamodb.get_conversation(email, conv_id)
         history = conversation.get("messages", []) if conversation else []
 
+        language_name = get_language_name(request.language)
         system_prompt = VOICE_ASSISTANT_PROMPT.format(
             user_name=current_user.get("name", "User"),
             user_trade=current_user.get("primary_trade", "worker"),
             user_location=current_user.get("location", "India"),
             user_state=current_user.get("state", ""),
-            language=get_language_name(request.language),
+            language=language_name,
         )
 
+        print(f"[VOICE-BASE64] Language: {request.language} ({language_name}), User text: {user_text[:50]}...")
+
+        # Add language reminder to user prompt
+        enhanced_prompt = f"[User language: {language_name}] {user_text}"
+
         ai_response = await bedrock_service.generate_response(
-            prompt=user_text,
+            prompt=enhanced_prompt,
             system_prompt=system_prompt,
             conversation_history=history[-10:],
         )
+        
+        print(f"[VOICE-BASE64] AI response (first 100 chars): {ai_response[:100]}...")
+        print(f"[VOICE-BASE64] Response length: {len(ai_response)} chars")
 
         # ===== Step 3: Text-to-Speech =====
         tts_result = await speech_service.synthesize_speech(
@@ -321,6 +343,13 @@ async def synthesize_speech(
     Converts text to audio.
     """
     try:
+        if not request.text or not request.text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Text cannot be empty",
+            )
+        
+        print(f"[TTS] Synthesizing: text={request.text[:50]}..., language={request.language}")
         result = await speech_service.synthesize_speech(
             text=request.text,
             language_code=request.language,
@@ -328,6 +357,8 @@ async def synthesize_speech(
             pitch=request.pitch or 0.0,
             output_format=request.output_format or "MP3",
         )
+        
+        print(f"[TTS] Synthesis successful: format={result.get('audio_format')}, size={len(result.get('audio_content', ''))} chars")
 
         return SynthesizeResponse(
             audio_content=result["audio_content"],
@@ -335,6 +366,13 @@ async def synthesize_speech(
             language=request.language,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Synthesize error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Synthesize error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Text-to-Speech synthesis failed: {str(e)}"
+        )

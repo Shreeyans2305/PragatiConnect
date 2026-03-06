@@ -64,22 +64,24 @@ async def register(request: UserCreate):
         "expires": datetime.utcnow() + timedelta(minutes=5),
     }
     
-    # Send OTP via email
-    if not settings.email_mock_mode:
+    # Send OTP via email (strict mode: fail request if delivery fails)
+    email_sent = False
+    if settings.email_mock_mode:
+        email_sent = True
+    else:
         email_sent = await email_service.send_otp_email(email, otp)
         if not email_sent:
-            # Don't fail - let user know email couldn't be sent but they can still try
-            return {
-                "message": "User registered. Email delivery attempted.",
-                "email": email,
-                "note": "If email wasn't received, check spam folder or contact support",
-                # Include OTP in mock mode for testing
-                **({"otp": otp} if settings.otp_mock_mode else {}),
-            }
-    
+            # Clear generated OTP when email could not be delivered.
+            otp_store.pop(email, None)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to send verification email. Please try again.",
+            )
+
     return {
         "message": "OTP sent successfully to your email",
         "email": email,
+        "email_sent": email_sent,
         # Only include in mock mode for testing
         **({"otp": otp} if settings.otp_mock_mode else {}),
     }

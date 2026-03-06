@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     )
 
     # AWS Configuration
-    aws_region: str = "ap-south-1"
+    aws_region: str = "us-east-1"       # used for Bedrock
+    aws_s3_region: str = "ap-south-1"   # used for S3 and DynamoDB
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
 

@@ -2,7 +2,8 @@
 class UserProfile {
   final String email;
   final String? name;
-  final String? profilePhotoPath;
+  final String? profilePhotoPath; // local device file path (ephemeral)
+  final String? profilePhotoUrl;  // S3 URL from backend (persistent)
   final String primaryTrade;
   final List<String> secondaryTrades;
   final String location;
@@ -16,6 +17,7 @@ class UserProfile {
     required this.email,
     this.name,
     this.profilePhotoPath,
+    this.profilePhotoUrl,
     required this.primaryTrade,
     this.secondaryTrades = const [],
     required this.location,
@@ -26,6 +28,11 @@ class UserProfile {
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
+
+  /// Returns the best available photo to display:
+  /// - prefers the backend S3 URL (persistent across logout/login)
+  /// - falls back to local file path (used right after picking but before upload finishes)
+  String? get effectivePhotoUrl => profilePhotoUrl ?? profilePhotoPath;
 
   /// Available trades with display names and icons
   static const Map<String, Map<String, dynamic>> trades = {
@@ -98,6 +105,8 @@ class UserProfile {
     String? name,
     String? profilePhotoPath,
     bool clearProfilePhoto = false,
+    String? profilePhotoUrl,
+    bool clearProfilePhotoUrl = false,
     String? primaryTrade,
     List<String>? secondaryTrades,
     String? location,
@@ -111,6 +120,7 @@ class UserProfile {
       email: email ?? this.email,
       name: name ?? this.name,
       profilePhotoPath: clearProfilePhoto ? null : (profilePhotoPath ?? this.profilePhotoPath),
+      profilePhotoUrl: clearProfilePhotoUrl ? null : (profilePhotoUrl ?? this.profilePhotoUrl),
       primaryTrade: primaryTrade ?? this.primaryTrade,
       secondaryTrades: secondaryTrades ?? this.secondaryTrades,
       location: location ?? this.location,
@@ -127,6 +137,7 @@ class UserProfile {
       'email': email,
       'name': name,
       'profile_photo_path': profilePhotoPath,
+      'profile_photo_url': profilePhotoUrl,
       'primary_trade': primaryTrade,
       'secondary_trades': secondaryTrades,
       'location': location,
@@ -143,6 +154,7 @@ class UserProfile {
       email: (json['email'] ?? json['phone_number'] ?? '') as String,
       name: json['name'] as String?,
       profilePhotoPath: json['profile_photo_path'] as String?,
+      profilePhotoUrl: json['profile_photo_url'] as String?,
       primaryTrade: (json['primary_trade'] as String?) ?? '',
       secondaryTrades: (json['secondary_trades'] as List<dynamic>?)
               ?.map((e) => e as String)

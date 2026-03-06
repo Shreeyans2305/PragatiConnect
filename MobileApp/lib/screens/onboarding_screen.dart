@@ -105,7 +105,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final token = authProvider.accessToken;
 
     if (token != null && Environment.useBackendApi) {
-      await userProvider.loadProfileFromBackend(token);
+      try {
+        await userProvider
+            .loadProfileFromBackend(token)
+            .timeout(const Duration(seconds: 6), onTimeout: () => false);
+      } catch (_) {
+        // Do not block onboarding progression if profile fetch fails.
+      }
       if (!mounted) return;
 
       if (userProvider.onboardingComplete) {
@@ -322,7 +328,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildEmailPage(ThemeData theme, bool isHindi) {
     final useBackend = Environment.useBackendApi;
-    final authProvider = context.watch<AuthProvider>();
     
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -483,7 +488,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ],
           
           // Success message when authenticated
-          if (authProvider.isAuthenticated && _otpSent) ...[
+          if (context.watch<AuthProvider>().isAuthenticated && _otpSent) ...[
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),

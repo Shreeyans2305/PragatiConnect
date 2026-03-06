@@ -13,6 +13,7 @@ class UserBase(BaseModel):
     state: Optional[str] = None
     preferred_language: str = "hi"
     whatsapp_opt_in: bool = False
+    profile_photo_url: Optional[str] = None
 
 
 class UserCreate(BaseModel):
@@ -29,6 +30,7 @@ class UserUpdate(BaseModel):
     state: Optional[str] = None
     preferred_language: Optional[str] = None
     whatsapp_opt_in: Optional[bool] = None
+    profile_photo_url: Optional[str] = None
 
 
 class UserProfile(UserBase):

@@ -8,6 +8,7 @@ import 'package:path/path.dart' as path;
 import '../providers/user_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user_profile.dart';
+import '../services/api_service.dart';
 import '../l10n/app_strings.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -26,7 +27,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late String _selectedLanguage;
   late List<String> _secondaryTrades;
   late bool _whatsappOptIn;
-  String? _profilePhotoPath;
+  String? _profilePhotoPath;  // local path (temporary preview)
+  String? _profilePhotoUrl;   // S3 URL (persistent)
+  bool _isUploadingPhoto = false;
   bool _isSaving = false;
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -42,6 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _secondaryTrades = List<String>.from(profile?.secondaryTrades ?? []);
     _whatsappOptIn = profile?.whatsappOptIn ?? false;
     _profilePhotoPath = profile?.profilePhotoPath;
+    _profilePhotoUrl = profile?.profilePhotoUrl;
   }
 
   @override
@@ -145,27 +149,47 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (pickedFile != null) {
-        // Copy to app's documents directory for persistence
-        final appDir = await getApplicationDocumentsDirectory();
-        final fileName = 'profile_photo_${DateTime.now().millisecondsSinceEpoch}${path.extension(pickedFile.path)}';
-        final savedPath = path.join(appDir.path, fileName);
-        
-        // Delete old photo if exists
-        if (_profilePhotoPath != null) {
-          final oldFile = File(_profilePhotoPath!);
-          if (await oldFile.exists()) {
-            await oldFile.delete();
-          }
-        }
-        
-        // Copy new photo
-        await File(pickedFile.path).copy(savedPath);
-        
+        // Show preview immediately from local path
         setState(() {
-          _profilePhotoPath = savedPath;
+          _profilePhotoPath = pickedFile.path;
+          _isUploadingPhoto = true;
         });
-        
         HapticFeedback.lightImpact();
+
+        // Upload to S3 via backend so it persists after logout
+        try {
+          final authProvider = context.read<AuthProvider>();
+          if (authProvider.isAuthenticated) {
+            final apiService = ApiService();
+            final updatedProfile = await apiService.uploadProfilePhoto(
+              authProvider.accessToken!,
+              File(pickedFile.path),
+            );
+            // Update the provider so drawer/settings also refreshes
+            if (mounted) {
+              final userProvider = context.read<UserProvider>();
+              await userProvider.updateProfile(
+                profilePhotoPath: _profilePhotoPath,
+                authToken: null, // already uploaded above, no need to sync again
+              );
+              setState(() {
+                _profilePhotoUrl = updatedProfile.profilePhotoUrl;
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Photo upload error: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Photo upload failed, will retry on save: $e'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _isUploadingPhoto = false);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -193,7 +217,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await userProvider.updateProfile(
         name: _nameController.text.trim(),
         profilePhotoPath: _profilePhotoPath,
-        clearProfilePhoto: hadPhotoBeforeButNowRemoved,
+        profilePhotoUrl: _profilePhotoUrl,
         primaryTrade: _selectedTrade,
         secondaryTrades: _secondaryTrades,
         location: _locationController.text.trim(),
@@ -285,26 +309,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     children: [
                       Builder(
                         builder: (context) {
-                          final hasValidPhoto = _profilePhotoPath != null && 
-                              File(_profilePhotoPath!).existsSync();
-                          return CircleAvatar(
-                            radius: 50,
-                            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-                            backgroundImage: hasValidPhoto
-                                ? FileImage(File(_profilePhotoPath!))
-                                : null,
-                            child: !hasValidPhoto
-                                ? Text(
-                                    _nameController.text.isNotEmpty
-                                        ? _nameController.text[0].toUpperCase()
-                                        : '?',
-                                    style: TextStyle(
-                                      fontSize: 36,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                  )
-                                : null,
+                          ImageProvider? photoImage;
+                          if (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty) {
+                            photoImage = NetworkImage(_profilePhotoUrl!);
+                          } else if (_profilePhotoPath != null && File(_profilePhotoPath!).existsSync()) {
+                            photoImage = FileImage(File(_profilePhotoPath!));
+                          }
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 50,
+                                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                                backgroundImage: photoImage,
+                                child: photoImage == null
+                                    ? Text(
+                                        _nameController.text.isNotEmpty
+                                            ? _nameController.text[0].toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              if (_isUploadingPhoto)
+                                const CircularProgressIndicator(),
+                            ],
                           );
                         },
                       ),

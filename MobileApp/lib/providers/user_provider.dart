@@ -57,7 +57,10 @@ class UserProvider extends ChangeNotifier {
     // Persist to backend first when authenticated.
     if (authToken != null && authToken.isNotEmpty) {
       try {
-        _profile = await _apiService.updateProfile(authToken, profile);
+        final backendProfile = await _apiService.updateProfile(authToken, profile);
+        _profile = backendProfile.copyWith(
+          profilePhotoPath: profile.profilePhotoPath,
+        );
       } catch (e) {
         debugPrint('Error syncing profile to backend: $e');
       }
@@ -79,11 +82,18 @@ class UserProvider extends ChangeNotifier {
   Future<bool> loadProfileFromBackend(String authToken) async {
     try {
       final backendProfile = await _apiService.getProfile(authToken);
-      _profile = backendProfile;
-      _onboardingComplete = _isProfileComplete(backendProfile);
+      final localPhotoPath = _profile?.profilePhotoPath;
+
+      // Use backend-provided photo URL (fresh presigned URL) and preserve local path
+      _profile = backendProfile.copyWith(
+        profilePhotoPath: localPhotoPath,
+        // backendProfile.profilePhotoUrl already has fresh presigned URL from server
+      );
+      _onboardingComplete = _isProfileComplete(_profile!);
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_profileKey, json.encode(backendProfile.toJson()));
+      // Save the merged profile so photo URL is cached for offline/relaunch
+      await prefs.setString(_profileKey, json.encode(_profile!.toJson()));
       await prefs.setBool(_onboardingCompleteKey, _onboardingComplete);
 
       notifyListeners();
@@ -99,6 +109,8 @@ class UserProvider extends ChangeNotifier {
     String? name,
     String? profilePhotoPath,
     bool clearProfilePhoto = false,
+    String? profilePhotoUrl,
+    bool clearProfilePhotoUrl = false,
     String? primaryTrade,
     List<String>? secondaryTrades,
     String? location,
@@ -113,6 +125,8 @@ class UserProvider extends ChangeNotifier {
       name: name,
       profilePhotoPath: profilePhotoPath,
       clearProfilePhoto: clearProfilePhoto,
+      profilePhotoUrl: profilePhotoUrl,
+      clearProfilePhotoUrl: clearProfilePhotoUrl,
       primaryTrade: primaryTrade,
       secondaryTrades: secondaryTrades,
       location: location,
@@ -124,7 +138,11 @@ class UserProvider extends ChangeNotifier {
 
     try {
       if (authToken != null && authToken.isNotEmpty) {
-        _profile = await _apiService.updateProfile(authToken, _profile!);
+        final backendResp = await _apiService.updateProfile(authToken, _profile!);
+        _profile = backendResp.copyWith(
+          profilePhotoPath: _profile!.profilePhotoPath,
+          profilePhotoUrl: _profile!.profilePhotoUrl,
+        );
       }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_profileKey, json.encode(_profile!.toJson()));

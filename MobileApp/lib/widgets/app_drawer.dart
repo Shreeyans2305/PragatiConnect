@@ -176,8 +176,17 @@ class AppDrawer extends StatelessWidget {
     final localeProvider = context.watch<LocaleProvider>();
     final isHindi = localeProvider.isHindi;
 
-    final hasPhoto = profile.profilePhotoPath != null && 
-        File(profile.profilePhotoPath!).existsSync();
+    final effectiveUrl = profile.effectivePhotoUrl;
+    final hasPhoto = effectiveUrl != null && effectiveUrl.isNotEmpty;
+    final isNetworkPhoto = hasPhoto && (effectiveUrl.startsWith('http://') || effectiveUrl.startsWith('https://'));
+    final isLocalPhoto = hasPhoto && !isNetworkPhoto && File(effectiveUrl).existsSync();
+
+    ImageProvider? photoProvider;
+    if (isNetworkPhoto) {
+      photoProvider = NetworkImage(effectiveUrl);
+    } else if (isLocalPhoto) {
+      photoProvider = FileImage(File(effectiveUrl));
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
@@ -187,18 +196,18 @@ class AppDrawer extends StatelessWidget {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              gradient: hasPhoto ? null : LinearGradient(
+              gradient: photoProvider == null ? LinearGradient(
                 colors: [primaryColor, AppColors.secondary],
-              ),
+              ) : null,
               borderRadius: BorderRadius.circular(14),
-              image: hasPhoto
+              image: photoProvider != null
                   ? DecorationImage(
-                      image: FileImage(File(profile.profilePhotoPath!)),
+                      image: photoProvider,
                       fit: BoxFit.cover,
                     )
                   : null,
             ),
-            child: hasPhoto
+            child: photoProvider != null
                 ? null
                 : Center(
                     child: Text(

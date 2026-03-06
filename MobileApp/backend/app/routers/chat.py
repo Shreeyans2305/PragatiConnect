@@ -59,6 +59,10 @@ def get_language_name(code: str) -> str:
         "ta": "Tamil",
         "te": "Telugu",
         "bn": "Bengali",
+        "gu": "Gujarati",
+        "kn": "Kannada",
+        "ml": "Malayalam",
+        "pa": "Punjabi",
     }
     return languages.get(code, "Hindi")
 
@@ -77,20 +81,29 @@ async def send_message(
     history = conversation.get("messages", []) if conversation else []
     
     # Build system prompt with user context
+    language_name = get_language_name(request.language)
     system_prompt = CHAT_ASSISTANT_PROMPT.format(
         user_name=current_user.get("name", "User"),
         user_trade=current_user.get("primary_trade", "worker"),
         user_location=current_user.get("location", "India"),
         user_state=current_user.get("state", ""),
-        language=get_language_name(request.language),
+        language=language_name,
     )
+    
+    print(f"[CHAT] Language: {request.language} ({language_name}), Message: {request.message[:50]}...")
+    
+    # Send the raw message to let AI detect language based on prompt
+    enhanced_prompt = request.message
     
     # Get AI response (Bedrock with Gemini fallback)
     response_text = await generate_ai_response(
-        prompt=request.message,
+        prompt=enhanced_prompt,
         system_prompt=system_prompt,
         conversation_history=history[-10:],  # Last 10 messages for context
     )
+    
+    print(f"[CHAT] AI response (first 100 chars): {response_text[:100]}...")
+    print(f"[CHAT] Response length: {len(response_text)} chars")
     
     # Save messages
     user_message = {
@@ -172,21 +185,22 @@ async def voice_query(
     history = conversation.get("messages", []) if conversation else []
     
     # Build system prompt with user context
+    language_name = get_language_name(request.language)
     system_prompt = VOICE_ASSISTANT_PROMPT.format(
         user_name=current_user.get("name", "User"),
         user_trade=current_user.get("primary_trade", "worker"),
         user_location=current_user.get("location", "India"),
         user_state=current_user.get("state", ""),
-        language="English" if request.language == "en" else "Hindi",
+        language=language_name,
     )
     
     # Determine if this needs a detailed response
     needs_detail = _is_detailed_question(request.transcript)
     
     # Enhance prompt for detailed questions
-    prompt = request.transcript
+    prompt = f"[User language: {language_name}] {request.transcript}"
     if needs_detail:
-        prompt = f"[GIVE A DETAILED 4-6 SENTENCE RESPONSE] {request.transcript}"
+        prompt = f"[GIVE A DETAILED 4-6 SENTENCE RESPONSE] {prompt}"
     
     # Get AI response with conversation history
     response_text = await generate_ai_response(

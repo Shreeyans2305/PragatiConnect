@@ -141,8 +141,16 @@ async def estimate_price(
             detail=f"Image too large. Maximum size: {MAX_IMAGE_SIZE // (1024*1024)}MB",
         )
     
-    # Compress image
-    compressed = compress_image(image_bytes)
+    # Compress image with error handling
+    try:
+        compressed = compress_image(image_bytes)
+        print(f"[DEBUG] Image compressed: {len(compressed)} bytes")
+    except Exception as e:
+        print(f"[ERROR] Image compression failed: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to process image: {str(e)}",
+        )
     
     # Upload to S3
     s3_key = s3_client.upload_image(compressed, email)
@@ -156,12 +164,29 @@ async def estimate_price(
     
     # Analyze with Bedrock
     try:
+        print(f"[DEBUG] Starting Bedrock analysis with prompt length: {len(prompt)}")
         analysis = await bedrock_service.analyze_image(
             image_bytes=compressed,
             prompt=prompt,  # Use the full formatted prompt with instructions
             system_prompt=None,  # No need for additional system prompt
         )
+        print(f"[DEBUG] Analysis complete: {analysis}")
+        if not isinstance(analysis, dict):
+            print(f"[ERROR] Bedrock returned non-dict response: {analysis}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Bedrock returned unexpected response: {analysis}",
+            )
+        if 'error' in analysis:
+            print(f"[ERROR] Bedrock returned error: {analysis['error']}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Bedrock error: {analysis['error']}",
+            )
     except Exception as e:
+        print(f"[ERROR] Bedrock analysis failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to analyze image: {str(e)}",
@@ -175,6 +200,8 @@ async def estimate_price(
     
     # Extract data from analysis with validation
     # Handle materials - convert to list of dicts if needed
+    from decimal import Decimal
+    
     materials = analysis.get("materials", [])
     if materials and isinstance(materials, list) and len(materials) > 0:
         # If materials are dicts, ensure they have material and confidence keys
@@ -182,7 +209,7 @@ async def estimate_price(
             materials = [
                 {
                     "material": m.get("material", m.get("name", str(m))),
-                    "confidence": float(m.get("confidence", 0.5))
+                    "confidence": Decimal(str(m.get("confidence", 0.5)))
                 }
                 for m in materials
             ]
@@ -244,7 +271,7 @@ async def estimate_price(
     estimate_data = {
         "product_category": analysis.get("product_category", "Unknown"),
         "materials": materials,
-        "craftsmanship_score": max(1, min(10, analysis.get("craftsmanship_score", 5))),  # Ensure 1-10 range
+        "craftsmanship_score": max(1, min(10, int(float(analysis.get("craftsmanship_score", 5))))),  # Ensure 1-10 range
         "craftsmanship_description": analysis.get("craftsmanship_description", "Good quality handmade product"),
         "price_min": price_min,
         "price_max": price_max,

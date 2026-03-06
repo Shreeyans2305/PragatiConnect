@@ -25,10 +25,16 @@ class ApiException implements Exception {
   factory ApiException.fromResponse(http.Response response) {
     try {
       final body = json.decode(response.body) as Map<String, dynamic>;
+      final detail = body['detail'];
+      final detailMessage = detail is String
+          ? detail
+          : (detail is Map<String, dynamic>
+              ? detail['message'] as String?
+              : null);
       return ApiException(
         statusCode: response.statusCode,
         errorCode: body['error_code'] as String? ?? 'UNKNOWN',
-        message: body['message'] as String? ?? 'An error occurred',
+        message: body['message'] as String? ?? detailMessage ?? 'An error occurred',
         details: body['details'] as Map<String, dynamic>?,
       );
     } catch (_) {
@@ -290,6 +296,25 @@ class ApiService {
   /// Sync profile to backend
   Future<void> syncProfile(String authToken, UserProfile profile) async {
     await _put('/profile', authToken: authToken, body: profile.toJson());
+  }
+
+  /// Upload profile photo — returns the updated UserProfile with a fresh presigned URL
+  Future<UserProfile> uploadProfilePhoto(String authToken, File imageFile) async {
+    final uri = Uri.parse('$baseUrl/profile/photo');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $authToken'
+      ..files.add(await http.MultipartFile.fromPath('photo', imageFile.path));
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode == 200) {
+      return UserProfile.fromJson(
+        json.decode(response.body) as Map<String, dynamic>,
+      );
+    } else {
+      throw ApiException.fromResponse(response);
+    }
   }
 
   // ─── Chat Endpoints ───────────────────────────────────────────────────────

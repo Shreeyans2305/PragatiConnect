@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -30,6 +31,11 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   final FlutterTts _tts = FlutterTts();
   final GeminiService _gemini = GeminiService();
   final AudioPlayer _audioPlayer = AudioPlayer();
+
+  // Stream subscriptions — cancelled and re-assigned before each playback
+  // to avoid stacking up listeners that fight each other.
+  StreamSubscription<void>? _playerCompleteSub;
+  StreamSubscription<PlayerState>? _playerStateSub;
 
   _VoiceState _state = _VoiceState.idle;
   String _recognizedText = '';
@@ -218,8 +224,16 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
             _isInListeningSession && 
             !_userStoppedManually &&
             _consecutiveErrors < _maxConsecutiveErrors) {
-          debugPrint('🎤 Recoverable error, will restart...');
-          _restartListening();
+          
+          if (_recognizedText.isNotEmpty) {
+            debugPrint('🎤 Recoverable error but have text, processing instead of restart...');
+            _isInListeningSession = false;
+            _isRestarting = false;
+            _processVoiceInput();
+          } else {
+            debugPrint('🎤 Recoverable error, will restart...');
+            _restartListening();
+          }
           return;
         }
         
@@ -251,8 +265,16 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
             !_isRestarting &&
             _state == _VoiceState.listening &&
             _consecutiveErrors < _maxConsecutiveErrors) {
-          debugPrint('🎤 Status notListening, will restart...');
-          _restartListening();
+          
+          if (_recognizedText.isNotEmpty) {
+            debugPrint('🎤 Status notListening with text, treating as final and processing...');
+            _isInListeningSession = false;
+            _isRestarting = false;
+            _processVoiceInput();
+          } else {
+            debugPrint('🎤 Status notListening, will restart...');
+            _restartListening();
+          }
         }
       },
     );
@@ -274,6 +296,27 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   }
 
   Future<void> _initTts() async {
+    // Override silent hardware switch (iOS) and ensure loud playback
+    final AudioContext audioContext = AudioContext(
+      iOS: AudioContextIOS(
+        category: AVAudioSessionCategory.playback,
+        options: const {
+          AVAudioSessionOptions.defaultToSpeaker,
+          AVAudioSessionOptions.allowAirPlay,
+          AVAudioSessionOptions.allowBluetooth,
+          AVAudioSessionOptions.allowBluetoothA2DP,
+        },
+      ),
+      android: AudioContextAndroid(
+        isSpeakerphoneOn: true,
+        stayAwake: true,
+        contentType: AndroidContentType.speech,
+        usageType: AndroidUsageType.media,
+        audioFocus: AndroidAudioFocus.gain,
+      ),
+    );
+    await AudioPlayer.global.setAudioContext(audioContext);
+
     // Platform-specific TTS setup
     if (Platform.isIOS) {
       await _tts.setSharedInstance(true);
@@ -516,29 +559,33 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
 
   /// Restarts the speech recognizer seamlessly when the platform
   /// times out but the user hasn't stopped manually.
-  void _restartListening() {
+  Future<void> _restartListening() async {
     if (!_isInListeningSession || _userStoppedManually || !mounted || _isRestarting) return;
     
     _isRestarting = true;
     debugPrint('🎤 Scheduling restart, attempt ${_consecutiveErrors}/$_maxConsecutiveErrors');
     
-    // Cancel and stop current session first
-    _speech.cancel().then((_) {
-      return _speech.stop();
-    }).then((_) {
-      // Use progressively longer delay for retries (500ms, 750ms, 1000ms, etc.)
-      final delayMs = 500 + (_consecutiveErrors * 250);
-      debugPrint('🎤 Waiting ${delayMs}ms before restart...');
-      
-      Future.delayed(Duration(milliseconds: delayMs), () {
-        if (!_isInListeningSession || _userStoppedManually || !mounted) {
-          _isRestarting = false;
-          return;
-        }
-        _isRestarting = false; // Reset before starting new cycle
-        _beginListenCycle();
-      });
-    });
+    try {
+      // Cancel and stop current session first
+      await _speech.cancel();
+      await _speech.stop();
+    } catch (_) {
+      // Ignore errors during cancel/stop
+    }
+
+    // Use progressively longer delay for retries (500ms, 750ms, 1000ms, etc.)
+    final delayMs = 500 + (_consecutiveErrors * 250);
+    debugPrint('🎤 Waiting ${delayMs}ms before restart...');
+    
+    await Future.delayed(Duration(milliseconds: delayMs));
+    
+    if (!_isInListeningSession || _userStoppedManually || !mounted) {
+      _isRestarting = false;
+      return;
+    }
+    
+    _isRestarting = false; // Reset before starting new cycle
+    _beginListenCycle();
   }
 
   Future<void> _stopListening() async {
@@ -699,17 +746,21 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   /// Play audio response from backend TTS
   Future<void> _playAudioResponse(Uint8List audioData, String format) async {
     debugPrint('🔊 Playing audio response: ${audioData.length} bytes, format: $format');
-    
-    // If audio data is too small, it's probably invalid
+
     if (audioData.length < 100) {
       debugPrint('🔊 Audio data too small, falling back to local TTS');
       await _fallbackToLocalTts();
       return;
     }
-    
+
     try {
-      // Set completion handler for audio player
-      _audioPlayer.onPlayerComplete.listen((_) {
+      // --- Stop any in-progress playback and cancel old subscriptions ---
+      await _audioPlayer.stop();
+      await _playerCompleteSub?.cancel();
+      await _playerStateSub?.cancel();
+
+      // Completion handler — transition back to idle when audio finishes
+      _playerCompleteSub = _audioPlayer.onPlayerComplete.listen((_) {
         debugPrint('🔊 Audio playback completed');
         if (mounted) {
           setState(() {
@@ -726,25 +777,45 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
           });
         }
       });
-      
-      // Set error handler for audio player
-      _audioPlayer.onPlayerStateChanged.listen((state) {
+
+      // State watcher — for debug only, no side-effects
+      _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
         debugPrint('🔊 Audio player state: $state');
       });
 
-      // iOS AVPlayer requires a file with proper extension
-      // Save audio to temporary file with correct extension
+      // Write to a temp file with correct extension so iOS AVPlayer is happy
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final extension = format.toLowerCase() == 'mp3' ? 'mp3' : format.toLowerCase();
-      final audioFile = File('${tempDir.path}/tts_response_$timestamp.$extension');
+      final ext = format.toLowerCase() == 'mp3' ? 'mp3' : format.toLowerCase();
+      final audioFile = File('${tempDir.path}/tts_response_$timestamp.$ext');
       await audioFile.writeAsBytes(audioData);
       debugPrint('🔊 Audio saved to: ${audioFile.path}');
-      
-      // Play from file (works on both iOS and Android)
+
+      // Re-apply AudioContext right before playing to fight iOS session resets
+      await AudioPlayer.global.setAudioContext(
+        AudioContext(
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: const {
+              AVAudioSessionOptions.defaultToSpeaker,
+              AVAudioSessionOptions.allowAirPlay,
+              AVAudioSessionOptions.allowBluetooth,
+              AVAudioSessionOptions.allowBluetoothA2DP,
+            },
+          ),
+          android: AudioContextAndroid(
+            isSpeakerphoneOn: true,
+            stayAwake: true,
+            contentType: AndroidContentType.speech,
+            usageType: AndroidUsageType.media,
+            audioFocus: AndroidAudioFocus.gain,
+          ),
+        ),
+      );
+
       await _audioPlayer.play(DeviceFileSource(audioFile.path));
       debugPrint('🔊 Audio playback started');
-      
+
       // Clean up old audio files in background
       _cleanupOldAudioFiles(tempDir);
     } catch (e) {
@@ -842,9 +913,10 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   }
 
   @override
-  @override
   void dispose() {
     debugPrint('🎤 Voice assistant session ended, clearing context: $_conversationId');
+    _playerCompleteSub?.cancel();
+    _playerStateSub?.cancel();
     _sphereController.dispose();
     _pulseController.dispose();
     _aiSpeakController.dispose();

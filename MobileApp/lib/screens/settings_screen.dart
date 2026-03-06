@@ -68,15 +68,21 @@ class SettingsScreen extends StatelessWidget {
                     children: [
                       Builder(
                         builder: (context) {
-                          final photoPath = userProvider.profile?.profilePhotoPath;
-                          final hasValidPhoto = photoPath != null && File(photoPath).existsSync();
+                          final effectiveUrl = userProvider.profile?.effectivePhotoUrl;
+                          final isNetwork = effectiveUrl != null &&
+                              (effectiveUrl.startsWith('http://') ||
+                                  effectiveUrl.startsWith('https://'));
+                          final isLocal = effectiveUrl != null &&
+                              !isNetwork &&
+                              File(effectiveUrl).existsSync();
+                          ImageProvider? photo;
+                          if (isNetwork) photo = NetworkImage(effectiveUrl);
+                          else if (isLocal) photo = FileImage(File(effectiveUrl));
                           return CircleAvatar(
                             radius: 28,
                             backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                            backgroundImage: hasValidPhoto
-                                ? FileImage(File(photoPath))
-                                : null,
-                            child: !hasValidPhoto
+                            backgroundImage: photo,
+                            child: photo == null
                                 ? Text(
                                     (userProvider.profile?.name?.isNotEmpty == true)
                                         ? userProvider.profile!.name![0].toUpperCase()
