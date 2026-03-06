@@ -18,6 +18,21 @@ from app.models.price_estimate import (
 
 router = APIRouter()
 
+
+def _get_language_name(code: str) -> str:
+    """Get full language name from code."""
+    languages = {
+        "en": "English",
+        "hi": "Hindi",
+        "mr": "Marathi",
+        "ta": "Tamil",
+        "te": "Telugu",
+        "bn": "Bengali",
+        "gu": "Gujarati",
+        "pa": "Punjabi",
+    }
+    return languages.get(code, "English")
+
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 ALLOWED_TYPES = [
     "image/jpeg",
@@ -160,6 +175,7 @@ async def estimate_price(
         user_trade=current_user.get("primary_trade", "artisan"),
         user_location=current_user.get("location", "India"),
         user_state=current_user.get("state", ""),
+        language=_get_language_name(language),
     )
     
     # Analyze with Bedrock
@@ -280,12 +296,13 @@ async def estimate_price(
         "image_s3_key": s3_key,
     }
     
+    
     # Save to database
     dynamodb.create_price_estimate(email, estimate_id, estimate_data)
     
     # Get presigned URL for image
     image_url = s3_client.get_presigned_url(s3_key)
-    
+
     return PriceEstimateResponse(
         estimate_id=estimate_id,
         product_category=estimate_data["product_category"],

@@ -474,12 +474,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline, color: theme.colorScheme.error),
+                  Icon(
+                    Icons.error_outline,
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _authError!,
-                      style: TextStyle(color: theme.colorScheme.error),
+                      _authError!.toLowerCase().contains('otp')
+                          ? 'Wrong OTP!'
+                          : _authError!,
+                      style: TextStyle(
+                        color: theme.colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],

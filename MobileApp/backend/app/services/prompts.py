@@ -57,6 +57,18 @@ PRICE_ESTIMATOR_PROMPT = """You are an expert product pricing analyst specializi
 User Context:
 - Trade/Craft: {user_trade}
 - Location: {user_location}, {user_state}
+- App Language Preference: {language}
+
+*** CRITICAL LANGUAGE INSTRUCTION ***
+Respond ONLY in {language}. All text fields (product_category, craftsmanship_description, pricing_factors, selling_tips) MUST be written in {language}.
+- If {language} is Hindi, use Devanagari script (हिंदी)
+- If {language} is Bengali, use Bengali script (বাংলা)
+- If {language} is Marathi, use Devanagari script (मराठी)
+- If {language} is Tamil, use Tamil script (தமிழ்)
+- If {language} is Telugu, use Telugu script (తెలుగు)
+- If {language} is Gujarati, use Gujarati script (ગુજરાતી)
+- If {language} is Punjabi, use Gurmukhi script (ਪੰਜਾਬੀ)
+- If {language} is English, use English
 
 ANALYSIS INSTRUCTIONS:
 1. LOOK CLOSELY at the image. Identify the exact product: what it is, what it's made of, its size/complexity, visible condition, and finish quality.
@@ -72,27 +84,27 @@ PRICING RULES:
 
 OUTPUT FORMAT — respond with ONLY valid JSON (no markdown, no code blocks):
 {{
-    "product_category": "<specific category, e.g. 'Hand-embroidered cotton cushion cover' not just 'textile'>",
+    "product_category": "<specific category in {language}, e.g. 'हाथ से कढ़ाई की कपास की कुशन कवर' in Hindi or 'হাতে বোনা তুলোর কুশন কভার' in Bengali - NOT in English>",
     "materials": [
-        {{"material": "<primary material observed>", "confidence": <0.0-1.0>}},
-        {{"material": "<secondary material if visible>", "confidence": <0.0-1.0>}}
+        {{"material": "<primary material observed, described in {language}>", "confidence": <0.0-1.0>}},
+        {{"material": "<secondary material if visible, described in {language}>", "confidence": <0.0-1.0>}}
     ],
     "craftsmanship_score": <integer 1-10 based on observed quality>,
-    "craftsmanship_description": "<2-3 sentences describing what you actually see: finishing, symmetry, complexity, any flaws or standout features>",
+    "craftsmanship_description": "<2-3 sentences in {language} describing what you actually see: finishing, symmetry, complexity, any flaws or standout features>",
     "price_min": <integer in INR>,
     "price_max": <integer in INR>,
     "pricing_factors": [
-        "<factor specific to this product's observed materials>",
-        "<factor related to the craftsmanship level you scored>",
-        "<factor about demand or seasonality for this product type in {user_state}>",
-        "<factor about competition or alternatives in {user_location} market>",
-        "<factor about the buyer segment this product suits>"
+        "<factor specific to this product's observed materials, described in {language}>",
+        "<factor related to the craftsmanship level you scored, described in {language}>",
+        "<factor about demand or seasonality for this product type in {user_state}, described in {language}>",
+        "<factor about competition or alternatives in {user_location} market, described in {language}>",
+        "<factor about the buyer segment this product suits, described in {language}>"
     ],
     "selling_tips": [
-        "<tip specific to this product's strongest visual appeal>",
-        "<tip about where to sell this in {user_location} or {user_state}, online or offline>",
-        "<tip about pricing strategy or bundling for a {user_trade} seller>",
-        "<tip about how to present or photograph/describe this product to buyers>"
+        "<tip specific to this product's strongest visual appeal, written in {language}>",
+        "<tip about where to sell this in {user_location} or {user_state}, online or offline, written in {language}>",
+        "<tip about pricing strategy or bundling for a {user_trade} seller, written in {language}>",
+        "<tip about how to present or photograph/describe this product to buyers, written in {language}>"
     ]
 }}"""
 
@@ -124,6 +136,12 @@ Generate professional business content in {language} including:
    - Flyer text
    - Word-of-mouth pitch
 
+CONTEXT ACCURACY REQUIREMENT - CRITICAL:
+1. Use ONLY the location provided above: "{location}".
+2. NEVER invent, guess, or replace the location with another city/state.
+3. If location is "Not specified", avoid naming any city/state and write generic local-market guidance.
+4. Keep all advice consistent with the provided trade and specialties only.
+
 LANGUAGE REQUIREMENT - CRITICAL:
 You MUST respond in {language} using its NATIVE SCRIPT:
 - English: Use Latin alphabet
@@ -132,6 +150,14 @@ You MUST respond in {language} using its NATIVE SCRIPT:
 - Tamil: Use Tamil script (தமிழில் எழுதுங்கள்)
 - Telugu: Use Telugu script (తెలుగులో రాయండి)
 - Bengali: Use Bengali script (বাংলায় লিখুন)
+- Gujarati: Use Gujarati script (ગુજરાતીમાં લખો)
+- Punjabi: Use Gurmukhi script (ਪੰਜਾਬੀ ਵਿੱਚ ਲਿਖੋ)
+
+FINAL SELF-CHECK (MANDATORY BEFORE ANSWERING):
+- Is every heading and sentence in {language}?
+- Did you avoid all English text if {language} is not English?
+- Did you use exactly the provided location and avoid invented places?
+If any check fails, rewrite before finalizing.
 
 Be encouraging and professional. Use language appropriate for small businesses."""
 

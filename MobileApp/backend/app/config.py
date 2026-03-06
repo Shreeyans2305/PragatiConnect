@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     jwt_expiry_hours: int = 24
 
     # OTP Configuration
-    otp_mock_mode: bool = True
+    otp_mock_mode: bool = False
     otp_mock_code: str = "123456"
 
     # Email Configuration (Gmail SMTP)

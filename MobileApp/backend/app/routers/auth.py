@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from datetime import datetime, timedelta
 from jose import jwt
-import random
+import secrets
 
 from app.config import settings
 from app.db.dynamodb import dynamodb
@@ -53,10 +53,7 @@ async def register(request: UserCreate):
     email = request.email.lower()  # Normalize email
     
     # Generate OTP
-    if settings.otp_mock_mode:
-        otp = settings.otp_mock_code
-    else:
-        otp = str(random.randint(100000, 999999))
+    otp = str(secrets.randbelow(900000) + 100000)
     
     # Store OTP (expires in 5 minutes)
     otp_store[email] = {
@@ -82,8 +79,6 @@ async def register(request: UserCreate):
         "message": "OTP sent successfully to your email",
         "email": email,
         "email_sent": email_sent,
-        # Only include in mock mode for testing
-        **({"otp": otp} if settings.otp_mock_mode else {}),
     }
 
 

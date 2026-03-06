@@ -951,7 +951,26 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
       final authProvider = context.read<AuthProvider>();
       
       if (!authProvider.isAuthenticated) {
-        _showError('Please sign in to use voice assistant');
+        showDialog(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Login Required'),
+            content: const Text('To use AI services kindly login'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  Navigator.of(context).pushNamed('/onboarding');
+                },
+                child: const Text('Go to Login'),
+              ),
+            ],
+          ),
+        );
         setState(() => _state = _VoiceState.idle);
         _intensityController.animateTo(0);
         return;

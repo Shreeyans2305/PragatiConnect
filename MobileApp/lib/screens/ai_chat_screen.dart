@@ -66,6 +66,31 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (text.isEmpty && _pendingAttachment == null) return;
     if (_isLoading) return;
 
+    final authProvider = context.read<AuthProvider>();
+    if (!authProvider.isAuthenticated || authProvider.accessToken == null) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Login Required'),
+          content: const Text('To use AI services kindly login'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                Navigator.of(context).pushNamed('/onboarding');
+              },
+              child: const Text('Go to Login'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     HapticFeedback.lightImpact();
 
     final attachment = _pendingAttachment;

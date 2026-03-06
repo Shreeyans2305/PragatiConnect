@@ -175,7 +175,10 @@ The JSON must be an array of objects with these exact fields:
     required String businessType,
     required String location,
     required String description,
+    String language = 'en',
   }) async {
+    final languageInstructions = _getLanguageInstructions(language);
+    
     final prompt =
         '''Generate a professional business profile and marketing content for:
 
@@ -183,6 +186,14 @@ The JSON must be an array of objects with these exact fields:
 **Business Type:** $businessType
 **Location:** $location
 **Description:** $description
+
+$languageInstructions
+
+CRITICAL RULES:
+- Use ONLY this location: "$location"
+- Never invent or substitute any other city/state
+- If location is empty, do not mention any specific city/state
+- Keep every heading and sentence in the requested language only
 
 Please provide:
 1. A professional business description (2-3 paragraphs)
@@ -192,7 +203,12 @@ Please provide:
 5. 2-3 marketing tips specific to this business type''';
 
     if (!isConfigured) {
-      return _getMockBusinessResponse(businessName, businessType);
+      return _getMockBusinessResponse(
+        businessName,
+        businessType,
+        location: location,
+        language: language,
+      );
     }
 
     try {
@@ -313,27 +329,59 @@ Tell me about your occupation and location, and I'll find the best schemes for y
 > **Note:** Connect a Gemini API key for full AI-powered assistance.''';
   }
 
-  String _getMockBusinessResponse(String name, String type) {
+  String _getMockBusinessResponse(
+    String name,
+    String type, {
+    required String location,
+    required String language,
+  }) {
+    final safeLocation = location.trim().isEmpty ? 'your local area' : location.trim();
+
+    if (language == 'hi') {
+      return '''# $name — व्यवसाय प्रोफ़ाइल
+
+## परिचय
+$name एक भरोसेमंद $type व्यवसाय है, जो $safeLocation में गुणवत्तापूर्ण सेवा देने पर केंद्रित है।
+
+## टैगलाइन
+*"गुणवत्ता का वादा, भरोसेमंद सेवा"*
+
+## मुख्य सेवाएँ
+- गुणवत्तापूर्ण काम
+- ग्राहक की ज़रूरत के अनुसार कस्टम सेवा
+- समय पर डिलीवरी
+
+## सोशल मीडिया बायो
+$name | $type | $safeLocation
+
+## मार्केटिंग टिप्स
+1. **WhatsApp Business प्रोफ़ाइल बनाएं**
+2. **संतुष्ट ग्राहकों की प्रतिक्रिया साझा करें**
+3. **त्योहारों/मौसम के अनुसार ऑफ़र दें**
+
+> **Note:** बेहतर, व्यक्तिगत कंटेंट के लिए Gemini API key जोड़ें।''';
+    }
+
     return '''# $name — Business Profile
 
 ## About
-$name is a trusted $type business committed to delivering quality products and services.
+$name is a trusted $type business focused on delivering quality services in $safeLocation.
 
 ## Tagline
-*"Quality Craftsmanship, Trusted Service"*
+*"Quality You Can Trust, Service You Can Rely On"*
 
 ## Key Services
-- Premium quality products
-- Custom orders and personalization
-- Door-to-door delivery
+- High-quality workmanship
+- Custom solutions for customer needs
+- Timely delivery and support
 
 ## Social Media Bio
-$name | $type | Quality you can trust 🏪
+$name | $type | $safeLocation
 
 ## Marketing Tips
-1. **Build a WhatsApp Business presence**
-2. **Collect customer testimonials**
-3. **Offer seasonal discounts**
+1. **Create a WhatsApp Business profile**
+2. **Show customer testimonials and before/after photos**
+3. **Run seasonal offers for repeat buyers**
 
 > **Note:** Connect a Gemini API key for personalized content.''';
   }
@@ -518,4 +566,26 @@ $schemeName is a Government of India welfare scheme designed to support the info
 
 > **Note:** Connect a Gemini API key for detailed, up-to-date information.''';
   }
-}
+
+  /// Get language-specific instructions for AI prompts
+  String _getLanguageInstructions(String languageCode) {
+    switch (languageCode.toLowerCase()) {
+      case 'hi':
+        return 'Please provide the response in Hindi (हिंदी).';
+      case 'mr':
+        return 'Please provide the response in Marathi (मराठी).';
+      case 'ta':
+        return 'Please provide the response in Tamil (தமிழ்).';
+      case 'te':
+        return 'Please provide the response in Telugu (తెలుగు).';
+      case 'bn':
+        return 'Please provide the response in Bengali (বাংলা).';
+      case 'gu':
+        return 'Please provide the response in Gujarati (ગુજરાતી).';
+      case 'pa':
+        return 'Please provide the response in Punjabi (ਪੰਜਾਬੀ).';
+      case 'en':
+      default:
+        return 'Please provide the response in English.';
+    }
+  }}

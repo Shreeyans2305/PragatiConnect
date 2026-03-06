@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../l10n/app_strings.dart';
+import '../providers/auth_provider.dart';
 import '../services/gemini_service.dart';
 import '../widgets/app_drawer.dart';
 
@@ -14,10 +16,46 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  static const String _loginPrompt = 'To use AI services kindly login';
+
+  void _showLoginPromptDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Login Required'),
+        content: const Text(_loginPrompt),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.of(context).pushNamed('/onboarding');
+            },
+            child: const Text('Go to Login'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openProtectedFeature(String route) {
+    final isAuthenticated = context.read<AuthProvider>().isAuthenticated;
+    if (!isAuthenticated) {
+      HapticFeedback.mediumImpact();
+      _showLoginPromptDialog();
+      return;
+    }
+    Navigator.pushNamed(context, route);
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAuthenticated = context.watch<AuthProvider>().isAuthenticated;
 
     return PopScope(
       canPop: true,
@@ -67,7 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _FadeSlideIn(
                 delay: 200,
                 child: _PressableCard(
-                  onTap: () => Navigator.pushNamed(context, '/ai-chat'),
+                  onTap: () => _openProtectedFeature('/ai-chat'),
                   child: _FeatureCardContent(
                     icon: Icons.smart_toy_rounded,
                     iconColor: Colors.deepPurple,
@@ -76,6 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         : const Color(0xFFEDE7F6),
                     title: s.get('ai_chatbot'),
                     description: s.get('ai_chatbot_desc'),
+                    isEnabled: isAuthenticated,
                   ),
                 ),
               ),
@@ -85,7 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _FadeSlideIn(
                 delay: 250,
                 child: _PressableCard(
-                  onTap: () => Navigator.pushNamed(context, '/voice-assistant'),
+                  onTap: () => _openProtectedFeature('/voice-assistant'),
                   child: _FeatureCardContent(
                     icon: Icons.mic_rounded,
                     iconColor: Colors.blue,
@@ -94,6 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         : const Color(0xFFE3F2FD),
                     title: s.get('voice_assistant'),
                     description: s.get('voice_assistant_desc'),
+                    isEnabled: isAuthenticated,
                   ),
                 ),
               ),
@@ -103,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _FadeSlideIn(
                 delay: 300,
                 child: _PressableCard(
-                  onTap: () => Navigator.pushNamed(context, '/price-estimator'),
+                  onTap: () => _openProtectedFeature('/price-estimator'),
                   child: _FeatureCardContent(
                     icon: Icons.sell_rounded,
                     iconColor: Colors.green,
@@ -111,7 +151,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ? Colors.green.withValues(alpha: 0.15)
                         : const Color(0xFFE8F5E9),
                     title: s.get('price_estimator'),
-                    description: 'Analyze products and get fair pricing',
+                    description: s.get('price_estimator_desc'),
+                    isEnabled: isAuthenticated,
                   ),
                 ),
               ),
@@ -121,7 +162,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _FadeSlideIn(
                 delay: 350,
                 child: _PressableCard(
-                  onTap: () => Navigator.pushNamed(context, '/business-boost'),
+                  onTap: () => _openProtectedFeature('/business-boost'),
                   child: _FeatureCardContent(
                     icon: Icons.store_rounded,
                     iconColor: AppColors.orange,
@@ -130,6 +171,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         : const Color(0xFFFEF3E7),
                     title: s.get('business_boost'),
                     description: s.get('business_boost_desc'),
+                    isEnabled: isAuthenticated,
                   ),
                 ),
               ),
@@ -682,6 +724,7 @@ class _FeatureCardContent extends StatelessWidget {
   final Color iconBgColor;
   final String title;
   final String description;
+  final bool isEnabled;
 
   const _FeatureCardContent({
     required this.icon,
@@ -689,6 +732,7 @@ class _FeatureCardContent extends StatelessWidget {
     required this.iconBgColor,
     required this.title,
     required this.description,
+    this.isEnabled = true,
   });
 
   @override
@@ -705,48 +749,51 @@ class _FeatureCardContent extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.4)
         : Colors.grey.shade600;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppPadding.cardPadding),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(AppPadding.cardRadius),
-        border: Border.all(color: borderClr),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: AppPadding.iconContainerSize,
-            height: AppPadding.iconContainerSize,
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: iconColor, size: 24),
-          ),
-          const SizedBox(height: 20),
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(description, style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.bottomRight,
-            child: Container(
-              width: 40,
-              height: 40,
+    return Opacity(
+      opacity: isEnabled ? 1 : 0.6,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppPadding.cardPadding),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(AppPadding.cardRadius),
+          border: Border.all(color: borderClr),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: AppPadding.iconContainerSize,
+              height: AppPadding.iconContainerSize,
               decoration: BoxDecoration(
-                color: chevronBg,
-                shape: BoxShape.circle,
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                Icons.chevron_right_rounded,
-                color: chevronClr,
-                size: 24,
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(height: 20),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(description, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: chevronBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isEnabled ? Icons.chevron_right_rounded : Icons.lock_rounded,
+                  color: chevronClr,
+                  size: 24,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

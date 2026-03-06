@@ -17,6 +17,7 @@ class SettingsScreen extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
     final localeProvider = context.watch<LocaleProvider>();
     final userProvider = context.watch<UserProvider>();
+    final authProvider = context.watch<AuthProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final s = S.of(context);
     final cardColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
@@ -321,7 +322,7 @@ class SettingsScreen extends StatelessWidget {
                     icon: Icons.auto_awesome_rounded,
                     title: s.get('ai_engine'),
                     trailing: Text(
-                      'Gemini 2.0 Flash',
+                      'Amazon-Nova-lite-v1',
                       style: TextStyle(color: subtitleColor, fontSize: 15),
                     ),
                     isDark: isDark,
@@ -329,50 +330,12 @@ class SettingsScreen extends StatelessWidget {
                   Divider(height: 1, indent: 60, color: borderColor),
                   _InfoTile(
                     icon: Icons.favorite_rounded,
-                    title: s.get('made_with'),
+                    title: 'Made for',
                     trailing: Text(
-                      'Flutter & Dart',
+                      'Dreamers Everywhere',
                       style: TextStyle(color: subtitleColor, fontSize: 15),
                     ),
                     isDark: isDark,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Section: Support
-            _SectionHeader(title: s.get('support'), isDark: isDark),
-            const SizedBox(height: 12),
-
-            Container(
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: borderColor),
-              ),
-              child: Column(
-                children: [
-                  _ActionTile(
-                    icon: Icons.help_outline_rounded,
-                    title: s.get('help_faq'),
-                    isDark: isDark,
-                    onTap: () => HapticFeedback.lightImpact(),
-                  ),
-                  Divider(height: 1, indent: 60, color: borderColor),
-                  _ActionTile(
-                    icon: Icons.privacy_tip_outlined,
-                    title: s.get('privacy_policy'),
-                    isDark: isDark,
-                    onTap: () => HapticFeedback.lightImpact(),
-                  ),
-                  Divider(height: 1, indent: 60, color: borderColor),
-                  _ActionTile(
-                    icon: Icons.description_outlined,
-                    title: s.get('terms'),
-                    isDark: isDark,
-                    onTap: () => HapticFeedback.lightImpact(),
                   ),
                 ],
               ),
@@ -393,37 +356,47 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 children: [
                   // Show auth status
-                  Builder(
-                    builder: (context) {
-                      final authProvider = context.watch<AuthProvider>();
-                      return _InfoTile(
-                        icon: authProvider.isAuthenticated 
-                            ? Icons.verified_user_rounded 
-                            : Icons.person_off_rounded,
-                        title: s.get('auth_status'),
-                        trailing: Text(
-                          authProvider.isAuthenticated 
-                              ? (localeProvider.languageCode == 'hi' ? 'लॉग इन' : 'Logged In')
-                              : (localeProvider.languageCode == 'hi' ? 'लॉग आउट' : 'Not Logged In'),
-                          style: TextStyle(
-                            color: authProvider.isAuthenticated 
-                                ? Colors.green 
-                                : subtitleColor,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        isDark: isDark,
-                      );
-                    },
+                  _InfoTile(
+                    icon: authProvider.isAuthenticated
+                        ? Icons.verified_user_rounded
+                        : Icons.person_off_rounded,
+                    title: s.get('auth_status'),
+                    trailing: Text(
+                      authProvider.isAuthenticated
+                          ? (localeProvider.languageCode == 'hi'
+                                ? 'लॉग इन'
+                                : 'Logged In')
+                          : (localeProvider.languageCode == 'hi'
+                                ? 'लॉग इन नहीं'
+                                : 'Not Logged In'),
+                      style: TextStyle(
+                        color: authProvider.isAuthenticated
+                            ? Colors.green
+                            : subtitleColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    isDark: isDark,
                   ),
                   Divider(height: 1, indent: 60, color: borderColor),
                   _ActionTile(
-                    icon: Icons.logout_rounded,
-                    title: s.get('logout'),
+                    icon: authProvider.isAuthenticated
+                        ? Icons.logout_rounded
+                        : Icons.login_rounded,
+                    title: authProvider.isAuthenticated
+                        ? s.get('logout')
+                        : 'Log In',
                     isDark: isDark,
-                    isDestructive: true,
-                    onTap: () => _showLogoutConfirmation(context, s, localeProvider),
+                    isDestructive: authProvider.isAuthenticated,
+                    onTap: () {
+                      if (authProvider.isAuthenticated) {
+                        _showLogoutConfirmation(context, s, localeProvider);
+                      } else {
+                        HapticFeedback.lightImpact();
+                        Navigator.of(context).pushNamed('/onboarding');
+                      }
+                    },
                   ),
                 ],
               ),
@@ -433,7 +406,7 @@ class SettingsScreen extends StatelessWidget {
 
             Center(
               child: Text(
-                'Pragati Connect © 2025',
+                'Pragati Connect © 2026',
                 style: TextStyle(
                   color: subtitleColor,
                   fontSize: 13,

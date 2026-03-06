@@ -4,12 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../l10n/app_strings.dart';
+import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/locale_provider.dart';
 import '../models/user_profile.dart';
 
 class AppDrawer extends StatelessWidget {
   final int currentIndex;
+  static const String _loginPrompt = 'To use AI services kindly login';
 
   const AppDrawer({super.key, required this.currentIndex});
 
@@ -29,6 +31,8 @@ class AppDrawer extends StatelessWidget {
         : AppColors.tertiary.withValues(alpha: 0.15);
     final s = S.of(context);
     final userProvider = context.watch<UserProvider>();
+    final authProvider = context.watch<AuthProvider>();
+    final isAuthenticated = authProvider.isAuthenticated;
     final profile = userProvider.profile;
 
     return Drawer(
@@ -101,25 +105,29 @@ class AppDrawer extends StatelessWidget {
               icon: Icons.smart_toy_rounded,
               label: s.get('ai_chat'),
               isSelected: currentIndex == 2,
-              onTap: () => _navigate(context, '/ai-chat'),
+              isDisabled: !isAuthenticated,
+              onTap: () => _navigateProtected(context, '/ai-chat'),
             ),
             _NavItem(
               icon: Icons.mic_rounded,
               label: s.get('voice_assistant'),
               isSelected: currentIndex == 3,
-              onTap: () => _navigate(context, '/voice-assistant'),
+              isDisabled: !isAuthenticated,
+              onTap: () => _navigateProtected(context, '/voice-assistant'),
             ),
             _NavItem(
               icon: Icons.sell_rounded,
               label: s.get('price_estimator'),
               isSelected: currentIndex == 4,
-              onTap: () => _navigate(context, '/price-estimator'),
+              isDisabled: !isAuthenticated,
+              onTap: () => _navigateProtected(context, '/price-estimator'),
             ),
             _NavItem(
               icon: Icons.store_rounded,
               label: s.get('business_boost'),
               isSelected: currentIndex == 5,
-              onTap: () => _navigate(context, '/business-boost'),
+              isDisabled: !isAuthenticated,
+              onTap: () => _navigateProtected(context, '/business-boost'),
             ),
 
             const Spacer(),
@@ -261,6 +269,36 @@ class AppDrawer extends StatelessWidget {
       Navigator.pushNamed(context, route);
     }
   }
+
+  void _navigateProtected(BuildContext context, String route) {
+    final isAuthenticated = context.read<AuthProvider>().isAuthenticated;
+    if (!isAuthenticated) {
+      HapticFeedback.mediumImpact();
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Login Required'),
+          content: const Text(_loginPrompt),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                Navigator.pop(context);
+                Navigator.of(context).pushNamed('/onboarding');
+              },
+              child: const Text('Go to Login'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    _navigate(context, route);
+  }
 }
 
 // ─── Nav item with Apple-style press highlight ──────────────────────────────
@@ -269,12 +307,14 @@ class _NavItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool isSelected;
+  final bool isDisabled;
   final VoidCallback onTap;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.isSelected,
+    this.isDisabled = false,
     required this.onTap,
   });
 
@@ -297,9 +337,15 @@ class _NavItemState extends State<_NavItem> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
+        onTapDown: (_) {
+          if (!widget.isDisabled) {
+            setState(() => _pressed = true);
+          }
+        },
         onTapUp: (_) {
-          setState(() => _pressed = false);
+          if (!widget.isDisabled) {
+            setState(() => _pressed = false);
+          }
           widget.onTap();
         },
         onTapCancel: () => setState(() => _pressed = false),
@@ -319,21 +365,36 @@ class _NavItemState extends State<_NavItem> {
             children: [
               Icon(
                 widget.icon,
-                color: widget.isSelected ? primaryColor : secondaryTextColor,
+                color: widget.isDisabled
+                    ? secondaryTextColor.withValues(alpha: 0.45)
+                    : widget.isSelected
+                    ? primaryColor
+                    : secondaryTextColor,
                 size: 22,
               ),
               const SizedBox(width: 14),
               Text(
                 widget.label,
                 style: TextStyle(
-                  color: widget.isSelected ? primaryColor : textColor,
+                  color: widget.isDisabled
+                      ? textColor.withValues(alpha: 0.45)
+                      : widget.isSelected
+                      ? primaryColor
+                      : textColor,
                   fontWeight: widget.isSelected
                       ? FontWeight.w600
                       : FontWeight.w500,
                   fontSize: 15,
                 ),
               ),
-              if (widget.isSelected) ...[
+              if (widget.isDisabled) ...[
+                const Spacer(),
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 16,
+                  color: secondaryTextColor.withValues(alpha: 0.6),
+                ),
+              ] else if (widget.isSelected) ...[
                 const Spacer(),
                 Container(
                   width: 6,

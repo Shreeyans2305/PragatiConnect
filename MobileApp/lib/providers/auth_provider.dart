@@ -148,7 +148,12 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } on ApiException catch (e) {
-      _errorMessage = e.message;
+      final msg = e.message.toLowerCase();
+      if (msg.contains('invalid otp')) {
+        _errorMessage = 'Wrong OTP!';
+      } else {
+        _errorMessage = e.message;
+      }
       _state = AuthState.error;
       _isLoading = false;
       notifyListeners();

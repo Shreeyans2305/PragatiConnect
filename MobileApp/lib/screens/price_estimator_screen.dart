@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../l10n/app_strings.dart';
 import '../providers/auth_provider.dart';
+import '../providers/locale_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/app_drawer.dart';
 
@@ -22,10 +23,12 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
   File? _selectedImage;
   bool _isAnalyzing = false;
   String? _analysisResult;
-  String? _priceMin;
-  String? _priceMax;
-  String? _productDescription;
-  String? _marketAnalysis;
+  int? _priceMin;
+  int? _priceMax;
+  String? _productCategory;
+  int? _craftsmanshipScore;
+  List<String> _pricingFactors = [];
+  List<String> _sellingTips = [];
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -36,11 +39,34 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
       duration: const Duration(seconds: 2),
       vsync: this,
     );
+    
+    // Listen to locale changes to rebuild when language changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final localeProvider = context.read<LocaleProvider>();
+        localeProvider.addListener(_onLocaleChange);
+      }
+    });
+  }
+
+  void _onLocaleChange() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    
+    // Remove locale change listener
+    try {
+      final localeProvider = context.read<LocaleProvider>();
+      localeProvider.removeListener(_onLocaleChange);
+    } catch (e) {
+      // Ignore errors when context is no longer available
+    }
+    
     super.dispose();
   }
 
@@ -59,8 +85,10 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
           _analysisResult = null;
           _priceMin = null;
           _priceMax = null;
-          _productDescription = null;
-          _marketAnalysis = null;
+          _productCategory = null;
+          _craftsmanshipScore = null;
+          _pricingFactors = [];
+          _sellingTips = [];
         });
       }
     } catch (e) {
@@ -87,29 +115,60 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
       final authProvider = context.read<AuthProvider>();
       if (!authProvider.isAuthenticated || authProvider.accessToken == null) {
         if (mounted) {
-          _showError('Please sign in to use price estimator');
+          showDialog(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('Login Required'),
+              content: const Text('To use AI services kindly login'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    Navigator.of(context).pushNamed('/onboarding');
+                  },
+                  child: const Text('Go to Login'),
+                ),
+              ],
+            ),
+          );
         }
         return;
       }
 
       final apiService = ApiService();
+      final localeProvider = context.read<LocaleProvider>();
+      final langCode = localeProvider.languageCode;
       final result = await apiService.analyzeImage(
         authToken: authProvider.accessToken!,
         image: _selectedImage!,
-        language: 'en',
+        language: langCode,
       );
+
+      final strings = AppStrings.of(context);
 
       if (!mounted) return;
 
       setState(() {
         // Map backend response fields to frontend state variables
         _analysisResult = result['craftsmanship_description'] ?? 'Analysis complete';
-        _priceMin = result['price_min']?.toString() ?? 'N/A';
-        _priceMax = result['price_max']?.toString() ?? 'N/A';
-        _productDescription = 'Category: ${result['product_category'] ?? 'Unknown'}\n'
-            'Craftsmanship Score: ${result['craftsmanship_score']}/10';
-        _marketAnalysis = 'Pricing Factors: ${(result['pricing_factors'] as List?)?.join(", ") ?? 'N/A'}\n\n'
-            'Selling Tips: ${(result['selling_tips'] as List?)?.join(", ") ?? 'N/A'}';
+        _priceMin = result['price_min'] is num ? (result['price_min'] as num).toInt() : null;
+        _priceMax = result['price_max'] is num ? (result['price_max'] as num).toInt() : null;
+        _productCategory = result['product_category']?.toString();
+        _craftsmanshipScore = result['craftsmanship_score'] is num
+          ? (result['craftsmanship_score'] as num).toInt()
+          : null;
+        _pricingFactors = ((result['pricing_factors'] as List?) ?? [])
+          .map((e) => e.toString())
+          .where((e) => e.trim().isNotEmpty)
+          .toList();
+        _sellingTips = ((result['selling_tips'] as List?) ?? [])
+          .map((e) => e.toString())
+          .where((e) => e.trim().isNotEmpty)
+          .toList();
         _isAnalyzing = false;
         _pulseController.stop();
       });
@@ -146,8 +205,10 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
       _analysisResult = null;
       _priceMin = null;
       _priceMax = null;
-      _productDescription = null;
-      _marketAnalysis = null;
+      _productCategory = null;
+      _craftsmanshipScore = null;
+      _pricingFactors = [];
+      _sellingTips = [];
       _isAnalyzing = false;
     });
     _pulseController.stop();
@@ -156,10 +217,11 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final strings = AppStrings.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Price Estimator'),
+        title: Text(strings.get('price_estimator')),
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu_rounded),
@@ -173,7 +235,7 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
           if (_selectedImage != null)
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
-              tooltip: 'Reset',
+              tooltip: strings.get('reset'),
               onPressed: _resetForm,
             ),
         ],
@@ -189,14 +251,14 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
 
             // Header
             Text(
-              'Upload Product Image',
+              strings.get('upload_product_image'),
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Take a photo or upload an image to get a fair price estimate',
+              strings.get('upload_product_desc'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.secondary,
               ),
@@ -209,6 +271,7 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
                 isDark: isDark,
                 onCameraTap: () => _pickImage(ImageSource.camera),
                 onGalleryTap: () => _pickImage(ImageSource.gallery),
+                strings: strings,
               )
             else
               Column(
@@ -244,7 +307,7 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
                             )
                           : const Icon(Icons.analytics_rounded),
                       label: Text(
-                        _isAnalyzing ? 'Analyzing...' : 'Analyze & Estimate Price',
+                        _isAnalyzing ? strings.get('analyzing') : strings.get('analyze_estimate_price'),
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       style: ElevatedButton.styleFrom(
@@ -260,9 +323,12 @@ class _PriceEstimatorScreenState extends State<PriceEstimatorScreen>
                       isDark: isDark,
                       priceMin: _priceMin,
                       priceMax: _priceMax,
-                      productDescription: _productDescription,
-                      marketAnalysis: _marketAnalysis,
+                      productCategory: _productCategory,
+                      craftsmanshipScore: _craftsmanshipScore,
+                      pricingFactors: _pricingFactors,
+                      sellingTips: _sellingTips,
                       analysisResult: _analysisResult,
+                      strings: strings,
                     ),
                   ],
 
@@ -282,11 +348,13 @@ class _ImagePickerSection extends StatelessWidget {
   final bool isDark;
   final VoidCallback onCameraTap;
   final VoidCallback onGalleryTap;
+  final AppStrings strings;
 
   const _ImagePickerSection({
     required this.isDark,
     required this.onCameraTap,
     required this.onGalleryTap,
+    required this.strings,
   });
 
   @override
@@ -296,8 +364,8 @@ class _ImagePickerSection extends StatelessWidget {
         // Camera Option
         _PickerOption(
           icon: Icons.camera_alt_rounded,
-          title: 'Take Photo',
-          subtitle: 'Capture with your camera',
+          title: strings.get('take_photo'),
+          subtitle: strings.get('capture_camera'),
           onTap: onCameraTap,
           isDark: isDark,
         ),
@@ -306,8 +374,8 @@ class _ImagePickerSection extends StatelessWidget {
         // Gallery Option
         _PickerOption(
           icon: Icons.image_rounded,
-          title: 'Choose from Gallery',
-          subtitle: 'Select from your device',
+          title: strings.get('choose_from_gallery'),
+          subtitle: strings.get('select_device'),
           onTap: onGalleryTap,
           isDark: isDark,
         ),
@@ -336,7 +404,7 @@ class _ImagePickerSection extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'For best results, upload clear photos of the product with good lighting. Supports: JPG, PNG, WebP, GIF, BMP, TIFF, SVG, HEIF.',
+                  strings.get('best_results_hint'),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.blue[400],
                       ),
@@ -447,37 +515,48 @@ class _PickerOptionState extends State<_PickerOption> {
 
 class _ResultCard extends StatelessWidget {
   final bool isDark;
-  final String? priceMin;
-  final String? priceMax;
-  final String? productDescription;
-  final String? marketAnalysis;
+  final int? priceMin;
+  final int? priceMax;
+  final String? productCategory;
+  final int? craftsmanshipScore;
+  final List<String> pricingFactors;
+  final List<String> sellingTips;
   final String? analysisResult;
+  final AppStrings strings;
 
   const _ResultCard({
     required this.isDark,
     required this.priceMin,
     required this.priceMax,
-    required this.productDescription,
-    required this.marketAnalysis,
+    required this.productCategory,
+    required this.craftsmanshipScore,
+    required this.pricingFactors,
+    required this.sellingTips,
     required this.analysisResult,
+    required this.strings,
   });
 
   @override
   Widget build(BuildContext context) {
+    final surface = isDark ? const Color(0xFF1F1F22) : Colors.white;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Price Range Card
+        // Price card
         Container(
-          padding: const EdgeInsets.all(20),
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: [
-                Colors.green[400]!.withValues(alpha: 0.15),
-                Colors.green[600]!.withValues(alpha: 0.1),
+                Colors.green[400]!.withValues(alpha: 0.16),
+                Colors.teal[500]!.withValues(alpha: 0.12),
               ],
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: Colors.green.withValues(alpha: 0.3),
             ),
@@ -486,9 +565,9 @@ class _ResultCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Estimated Price Range',
+                strings.get('estimated_price_range'),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: Colors.green[700],
                     ),
               ),
@@ -500,14 +579,14 @@ class _ResultCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        'Min Price',
+                        strings.get('min_price'),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.green[600],
+                              color: Colors.green[700],
                             ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '₹ ${priceMin ?? 'N/A'}',
+                        priceMin != null ? '₹ $priceMin' : strings.get('na'),
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.green[700],
@@ -524,14 +603,14 @@ class _ResultCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        'Max Price',
+                        strings.get('max_price'),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.green[600],
+                              color: Colors.green[700],
                             ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '₹ ${priceMax ?? 'N/A'}',
+                        priceMax != null ? '₹ $priceMax' : strings.get('na'),
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.green[700],
@@ -547,86 +626,236 @@ class _ResultCard extends StatelessWidget {
 
         const SizedBox(height: 16),
 
-        // Product Description
-        if (productDescription != null && productDescription!.isNotEmpty)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Product Description',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+        // Product summary tiles
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                icon: Icons.category_rounded,
+                label: strings.get('category'),
+                value: productCategory ?? strings.get('na'),
+                isDark: isDark,
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[850] : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  productDescription ?? '',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _MetricTile(
+                icon: Icons.workspace_premium_rounded,
+                label: strings.get('craftsmanship_score'),
+                value: craftsmanshipScore != null
+                    ? '$craftsmanshipScore/10'
+                    : strings.get('na'),
+                isDark: isDark,
               ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+          ],
+        ),
 
-        // Market Analysis
-        if (marketAnalysis != null && marketAnalysis!.isNotEmpty)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Market Analysis',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[850] : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  marketAnalysis ?? '',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+        const SizedBox(height: 16),
+
+        _InsightCard(
+          title: strings.get('pricing_factors'),
+          icon: Icons.insights_rounded,
+          points: pricingFactors,
+          isDark: isDark,
+          fallback: strings.get('na'),
+        ),
+
+        const SizedBox(height: 12),
+
+        _InsightCard(
+          title: strings.get('selling_tips'),
+          icon: Icons.campaign_rounded,
+          points: sellingTips,
+          isDark: isDark,
+          fallback: strings.get('na'),
+        ),
+
+        const SizedBox(height: 16),
 
         // Full Analysis
         if (analysisResult != null && analysisResult!.isNotEmpty)
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Detailed Analysis',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.all(12),
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[850] : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
+                  color: surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.grey.shade200,
+                  ),
                 ),
-                child: Text(
-                  analysisResult ?? '',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.psychology_rounded,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          strings.get('detailed_analysis'),
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      analysisResult ?? '',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            height: 1.5,
+                          ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
       ],
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isDark;
+
+  const _MetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F1F22) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<String> points;
+  final bool isDark;
+  final String fallback;
+
+  const _InsightCard({
+    required this.title,
+    required this.icon,
+    required this.points,
+    required this.isDark,
+    required this.fallback,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F1F22) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (points.isEmpty)
+            Text(fallback, style: Theme.of(context).textTheme.bodyMedium)
+          else
+            ...points.map(
+              (point) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        point,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              height: 1.4,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

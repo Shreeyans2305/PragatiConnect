@@ -7,7 +7,9 @@ import '../widgets/app_drawer.dart';
 import '../services/gemini_service.dart';
 import '../services/api_service.dart';
 import '../providers/auth_provider.dart';
+import '../providers/locale_provider.dart';
 import '../config/environment.dart';
+import '../l10n/app_strings.dart';
 
 class BusinessBoostScreen extends StatefulWidget {
   const BusinessBoostScreen({super.key});
@@ -39,6 +41,12 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final localeProvider = context.read<LocaleProvider>();
+        localeProvider.addListener(_onLocaleChange);
+      }
+    });
     _resultFade = CurvedAnimation(
       parent: _resultController,
       curve: Curves.easeOut,
@@ -52,18 +60,53 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
         );
   }
 
+  void _onLocaleChange() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
+    _resultController.dispose();
+    try {
+      final localeProvider = context.read<LocaleProvider>();
+      localeProvider.removeListener(_onLocaleChange);
+    } catch (e) {}
     _nameController.dispose();
     _typeController.dispose();
     _locationController.dispose();
     _descController.dispose();
-    _resultController.dispose();
     super.dispose();
   }
 
   Future<void> _generateProfile() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final authProvider = context.read<AuthProvider>();
+    if (!authProvider.isAuthenticated || authProvider.accessToken == null) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Login Required'),
+          content: const Text('To use AI services kindly login'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                Navigator.of(context).pushNamed('/onboarding');
+              },
+              child: const Text('Go to Login'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     HapticFeedback.mediumImpact();
 
@@ -75,15 +118,20 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
 
     String result;
     
+    // Get the user's preferred language
+    final locale = Localizations.localeOf(context);
+    final langCode = locale.languageCode;
+    
     // Use backend API (Amazon Nova) when available
     if (Environment.useBackendApi) {
-      result = await _generateWithBackend();
+      result = await _generateWithBackend(langCode);
     } else {
       result = await _gemini.generateBusinessProfile(
         businessName: _nameController.text.trim(),
         businessType: _typeController.text.trim(),
         location: _locationController.text.trim(),
         description: _descController.text.trim(),
+        language: langCode,
       );
     }
 
@@ -96,22 +144,14 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
   }
 
   /// Generate business profile using backend API (Amazon Nova)
-  Future<String> _generateWithBackend() async {
+  Future<String> _generateWithBackend(String langCode) async {
     try {
       final authProvider = context.read<AuthProvider>();
       
       if (!authProvider.isAuthenticated) {
-        debugPrint('💼 Business: Not authenticated, using Gemini fallback');
-        return await _gemini.generateBusinessProfile(
-          businessName: _nameController.text.trim(),
-          businessType: _typeController.text.trim(),
-          location: _locationController.text.trim(),
-          description: _descController.text.trim(),
-        );
+        debugPrint('💼 Business: Not authenticated');
+        return 'Please login to continue.';
       }
-
-      final locale = Localizations.localeOf(context);
-      final langCode = locale.languageCode;
 
       debugPrint('💼 Business: Using backend API with language: $langCode');
       
@@ -120,9 +160,9 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
         businessDetails: {
           'business_name': _nameController.text.trim(),
           'trade': _typeController.text.trim(),
+          'location': _locationController.text.trim(),
           'experience_years': 5, // Default
           'specialties': _descController.text.trim(),
-          'target_customers': _locationController.text.trim(),
         },
         language: langCode,
       );
@@ -136,6 +176,7 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
         businessType: _typeController.text.trim(),
         location: _locationController.text.trim(),
         description: _descController.text.trim(),
+        language: langCode,
       );
     }
   }
@@ -144,9 +185,10 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
     if (_generatedProfile != null) {
       HapticFeedback.selectionClick();
       Clipboard.setData(ClipboardData(text: _generatedProfile!));
+      final s = AppStrings.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Copied to clipboard!'),
+          content: Text(s.get('copied')),
           backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -167,10 +209,11 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
         : Colors.grey.shade200;
     final primary = Theme.of(context).colorScheme.primary;
     final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final s = AppStrings.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Business Boost'),
+        title: Text(s.get('business_boost')),
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu_rounded),
@@ -217,9 +260,9 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Boost Your Business',
-                    style: TextStyle(
+                  Text(
+                    s.get('boost_your_business'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -227,7 +270,7 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Generate a professional business profile and marketing content using AI.',
+                    s.get('boost_desc'),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 14,
@@ -245,13 +288,13 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildLabel('Business Name', context),
+                  _buildLabel(s.get('business_name'), context),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _nameController,
                     style: TextStyle(color: textColor),
                     decoration: InputDecoration(
-                      hintText: 'e.g., Radha\'s Handloom',
+                      hintText: s.get('business_name_hint'),
                       hintStyle: TextStyle(
                         color: isDark
                             ? Colors.white.withValues(alpha: 0.3)
@@ -259,17 +302,17 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                       ),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? s.get('required_field') : null,
                   ),
                   const SizedBox(height: 16),
 
-                  _buildLabel('Business Type', context),
+                  _buildLabel(s.get('business_type'), context),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _typeController,
                     style: TextStyle(color: textColor),
                     decoration: InputDecoration(
-                      hintText: 'e.g., Handloom Weaving',
+                      hintText: s.get('business_type_hint'),
                       hintStyle: TextStyle(
                         color: isDark
                             ? Colors.white.withValues(alpha: 0.3)
@@ -277,17 +320,17 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                       ),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? s.get('required_field') : null,
                   ),
                   const SizedBox(height: 16),
 
-                  _buildLabel('Location', context),
+                  _buildLabel(s.get('location'), context),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _locationController,
                     style: TextStyle(color: textColor),
                     decoration: InputDecoration(
-                      hintText: 'e.g., Kanchipuram, Tamil Nadu',
+                      hintText: s.get('location_hint'),
                       hintStyle: TextStyle(
                         color: isDark
                             ? Colors.white.withValues(alpha: 0.3)
@@ -295,19 +338,18 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                       ),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? s.get('required_field') : null,
                   ),
                   const SizedBox(height: 16),
 
-                  _buildLabel('Business Description', context),
+                  _buildLabel(s.get('business_description'), context),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _descController,
                     maxLines: 4,
                     style: TextStyle(color: textColor),
                     decoration: InputDecoration(
-                      hintText:
-                          'Tell us about your products, services, and what makes your business special...',
+                      hintText: s.get('business_description_hint'),
                       hintStyle: TextStyle(
                         color: isDark
                             ? Colors.white.withValues(alpha: 0.3)
@@ -315,7 +357,7 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                       ),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? s.get('required_field') : null,
                   ),
                   const SizedBox(height: 24),
 
@@ -323,6 +365,7 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                   _GenerateButton(
                     isLoading: _isLoading,
                     onTap: _generateProfile,
+                    strings: s,
                   ),
                 ],
               ),
@@ -337,7 +380,7 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                   position: _resultSlide,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: cardBg,
                       borderRadius: BorderRadius.circular(
@@ -357,44 +400,149 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Generated Profile',
-                              style: Theme.of(context).textTheme.titleLarge,
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                primary.withValues(alpha: 0.14),
+                                AppColors.secondary.withValues(alpha: 0.1),
+                              ],
                             ),
-                            _CopyButton(onTap: _copyToClipboard),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: primary.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: primary.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.auto_awesome_rounded,
+                                  color: primary,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      s.get('generated_profile'),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${_languageDisplayName(Localizations.localeOf(context).languageCode)} • AI',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .secondary,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _CopyButton(onTap: _copyToClipboard),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _InfoChip(
+                              icon: Icons.location_on_outlined,
+                              text: _locationController.text.trim().isEmpty
+                                  ? s.get('location')
+                                  : _locationController.text.trim(),
+                              isDark: isDark,
+                            ),
+                            _InfoChip(
+                              icon: Icons.work_outline_rounded,
+                              text: _typeController.text.trim(),
+                              isDark: isDark,
+                            ),
+                            _InfoChip(
+                              icon: Icons.translate_rounded,
+                              text: _languageDisplayName(
+                                Localizations.localeOf(context).languageCode,
+                              ),
+                              isDark: isDark,
+                            ),
                           ],
                         ),
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: borderClr),
+                          ),
+                          child: MarkdownBody(
+                            data: _generatedProfile!,
+                            selectable: true,
+                            styleSheet: MarkdownStyleSheet(
+                              p: TextStyle(
+                                fontSize: 15,
+                                height: 1.6,
+                                color: textColor,
+                              ),
+                              h1: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: textColor,
+                              ),
+                              h2: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: textColor,
+                              ),
+                              h3: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: textColor,
+                              ),
+                              listBullet: TextStyle(
+                                fontSize: 15,
+                                color: textColor,
+                              ),
+                              blockquote: TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 12),
-                        MarkdownBody(
-                          data: _generatedProfile!,
-                          styleSheet: MarkdownStyleSheet(
-                            p: TextStyle(
-                              fontSize: 15,
-                              height: 1.6,
-                              color: textColor,
-                            ),
-                            h1: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: textColor,
-                            ),
-                            h2: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: textColor,
-                            ),
-                            h3: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: textColor,
-                            ),
-                            listBullet: TextStyle(
-                              fontSize: 15,
-                              color: textColor,
-                            ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: _isLoading ? null : _generateProfile,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: Text(s.get('generate_profile')),
                           ),
                         ),
                       ],
@@ -418,6 +566,66 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
       ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
     );
   }
+
+  String _languageDisplayName(String code) {
+    switch (code) {
+      case 'hi':
+        return 'हिंदी';
+      case 'mr':
+        return 'मराठी';
+      case 'bn':
+        return 'বাংলা';
+      case 'ta':
+        return 'தமிழ்';
+      case 'te':
+        return 'తెలుగు';
+      case 'gu':
+        return 'ગુજરાતી';
+      case 'pa':
+        return 'ਪੰਜਾਬੀ';
+      default:
+        return 'English';
+    }
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool isDark;
+
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.shade300,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─── Generate Button with Apple spring ───────────────────────────────────────
@@ -425,8 +633,9 @@ class _BusinessBoostScreenState extends State<BusinessBoostScreen>
 class _GenerateButton extends StatefulWidget {
   final bool isLoading;
   final VoidCallback onTap;
+  final AppStrings strings;
 
-  const _GenerateButton({required this.isLoading, required this.onTap});
+  const _GenerateButton({required this.isLoading, required this.onTap, required this.strings});
 
   @override
   State<_GenerateButton> createState() => _GenerateButtonState();
@@ -500,7 +709,7 @@ class _GenerateButtonState extends State<_GenerateButton>
                 ),
               const SizedBox(width: 10),
               Text(
-                widget.isLoading ? 'Generating…' : 'Generate Profile',
+                widget.isLoading ? widget.strings.get('generating') : widget.strings.get('generate_profile'),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
