@@ -9,6 +9,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:provider/provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import '../l10n/app_strings.dart';
 import '../services/gemini_service.dart';
 import '../services/voice_api_service.dart';
@@ -31,6 +33,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   final FlutterTts _tts = FlutterTts();
   final GeminiService _gemini = GeminiService();
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioRecorder _backendRecorder = AudioRecorder();
 
   // Stream subscriptions — cancelled and re-assigned before each playback
   // to avoid stacking up listeners that fight each other.
@@ -79,11 +82,21 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
 
   /// Get the best available locale for a target language
   String _getBestLocale(String targetLocale) {
-    final langPrefix = targetLocale.split('-').first.toLowerCase();
+    if (_availableLocales.isEmpty) {
+      debugPrint('🎤 Warning: No available locales, using target: $targetLocale');
+      return targetLocale;
+    }
     
-    // First try exact match
+    final langPrefix = targetLocale.split('-').first.split('_').first.toLowerCase();
+    
+    // First try exact match (case-insensitive)
     for (final locale in _availableLocales) {
-      if (locale.localeId.toLowerCase() == targetLocale.toLowerCase()) {
+      final id = locale.localeId.toLowerCase();
+      final target = targetLocale.toLowerCase();
+      if (id == target || 
+          id.replaceAll('_', '-') == target || 
+          id.replaceAll('-', '_') == target) {
+        debugPrint('🎤 Exact match found: ${locale.localeId}');
         return locale.localeId;
       }
     }
@@ -91,21 +104,33 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     // Try any variant of the language (e.g., ta-IN, ta_IN, ta)
     for (final locale in _availableLocales) {
       final id = locale.localeId.toLowerCase();
-      if (id.startsWith('$langPrefix-') || id.startsWith('${langPrefix}_') || id == langPrefix) {
+      if (id.startsWith('$langPrefix-') || 
+          id.startsWith('${langPrefix}_') || 
+          id == langPrefix) {
+        debugPrint('🎤 Language prefix match found: ${locale.localeId} for $targetLocale');
         return locale.localeId;
       }
     }
     
-    // Fallback to Hindi, then English
-    for (final fallback in ['hi-IN', 'hi_IN', 'en-IN', 'en_IN', 'en-US']) {
+    // Fallback to Hindi, then English - try both formats
+    for (final fallback in ['hi-IN', 'hi_IN', 'hi', 'en-IN', 'en_IN', 'en-US', 'en_US', 'en']) {
       for (final locale in _availableLocales) {
-        if (locale.localeId.toLowerCase() == fallback.toLowerCase()) {
+        final id = locale.localeId.toLowerCase();
+        if (id == fallback.toLowerCase() || 
+            id.startsWith(fallback.toLowerCase().split('-').first.split('_').first)) {
+          debugPrint('🎤 Using fallback locale: ${locale.localeId} for $targetLocale');
           return locale.localeId;
         }
       }
     }
     
-    // Last resort: use the target as-is
+    // Last resort: return the first available locale
+    if (_availableLocales.isNotEmpty) {
+      debugPrint('🎤 No match found, using first available: ${_availableLocales.first.localeId}');
+      return _availableLocales.first.localeId;
+    }
+    
+    debugPrint('🎤 Warning: No locales available, using target: $targetLocale');
     return targetLocale;
   }
 
@@ -123,6 +148,13 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   
   /// Flag to prevent concurrent restart attempts
   bool _isRestarting = false;
+
+  /// Android fallback mode: record raw mic audio and transcribe via backend Google STT.
+  bool _forceBackendStt = false;
+  bool _isRecordingForBackendStt = false;
+  Timer? _backendSttAutoStopTimer;
+  int _localSttFailureCount = 0;
+  static const int _maxLocalSttFailuresBeforeBackend = 2;
 
   late AnimationController _sphereController;
   late AnimationController _pulseController;
@@ -142,6 +174,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     // Generate unique conversation ID for this voice assistant session
     _conversationId = _generateConversationId();
     debugPrint('🎤 Voice assistant session ID: $_conversationId');
+    _checkPermissions();  // Check permissions first
     _initSpeech();
     _initTts();
 
@@ -185,6 +218,30 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     return 'voice_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(10000)}';
   }
 
+  /// Check and request microphone permissions (critical for Android)
+  Future<void> _checkPermissions() async {
+    debugPrint('🎤 Checking microphone permissions...');
+    
+    // Check current permission status
+    var status = await Permission.microphone.status;
+    debugPrint('🎤 Microphone permission status: $status');
+    
+    if (status.isDenied || status.isPermanentlyDenied) {
+      debugPrint('🎤 Requesting microphone permission...');
+      status = await Permission.microphone.request();
+      debugPrint('🎤 Permission request result: $status');
+    }
+    
+    if (status.isGranted) {
+      debugPrint('🎤 ✓ Microphone permission granted');
+    } else {
+      debugPrint('🎤 ✗ Microphone permission denied');
+      if (mounted) {
+        _showError('Microphone permission is required for voice assistant');
+      }
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -198,27 +255,39 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   }
 
   Future<void> _initSpeech() async {
-    _speechAvailable = await _speech.initialize(
-      onError: (e) {
-        debugPrint('🎤 Speech error: ${e.errorMsg}');
-        if (!mounted) return;
-        
-        _consecutiveErrors++;
-        debugPrint('🎤 Consecutive errors: $_consecutiveErrors');
-        
-        // Check for recoverable errors, but prevent infinite loops
-        // Include common transient errors that can be retried
-        final errorMsg = e.errorMsg.toLowerCase();
-        final recoverable =
-            errorMsg.contains('error_speech_timeout') ||
-            errorMsg.contains('error_no_match') ||
-            errorMsg.contains('error_listen_failed') ||
-            errorMsg.contains('error_retry') ||
-            errorMsg.contains('error_unknown') ||
-            errorMsg.contains('error_audio') ||
-            errorMsg.contains('error_network') ||
-            errorMsg.contains('error_busy') ||
-            errorMsg.contains('209'); // iOS audio session error
+    try {
+      _speechAvailable = await _speech.initialize(
+        onError: (e) {
+          debugPrint('🎤 Speech error: ${e.errorMsg}');
+          if (!mounted) return;
+          
+          _consecutiveErrors++;
+          debugPrint('🎤 Consecutive errors: $_consecutiveErrors');
+          
+          // Check for recoverable errors, but prevent infinite loops
+          // Include common transient errors that can be retried
+          final errorMsg = e.errorMsg.toLowerCase();
+          final recoverable =
+              errorMsg.contains('error_speech_timeout') ||
+              errorMsg.contains('error_no_match') ||
+              errorMsg.contains('error_listen_failed') ||
+              errorMsg.contains('error_retry') ||
+              errorMsg.contains('error_unknown') ||
+              errorMsg.contains('error_audio') ||
+              errorMsg.contains('error_network') ||
+              errorMsg.contains('error_busy') ||
+              errorMsg.contains('error_client') ||
+              errorMsg.contains('error_server') ||
+              errorMsg.contains('209'); // iOS audio session error
+
+        if (Platform.isAndroid && errorMsg.contains('error_no_match')) {
+          _localSttFailureCount++;
+          debugPrint('🎤 Android no-match count: $_localSttFailureCount');
+          if (_localSttFailureCount >= 1) {
+            _forceBackendStt = true;
+            debugPrint('🎤 Enabling backend Google STT due to Android no-match error');
+          }
+        }
         
         if (recoverable && 
             _isInListeningSession && 
@@ -239,6 +308,10 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
         
         // Too many errors or non-recoverable - stop completely
         debugPrint('🎤 Stopping due to: ${_consecutiveErrors >= _maxConsecutiveErrors ? "max errors reached" : "non-recoverable error"}');
+        if (Platform.isAndroid && _consecutiveErrors >= _maxConsecutiveErrors) {
+          _forceBackendStt = true;
+          debugPrint('🎤 Enabling backend Google STT fallback after repeated Android STT errors');
+        }
         _isInListeningSession = false;
         _isRestarting = false;
         setState(() {
@@ -248,14 +321,14 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
         });
         _intensityController.animateTo(0);
       },
-      onStatus: (status) {
-        debugPrint('🎤 Speech status: $status');
-        if (!mounted) return;
-        
-        // Reset error count on successful listening status
-        if (status == 'listening') {
-          _consecutiveErrors = 0;
-          _isRestarting = false;
+        onStatus: (status) {
+          debugPrint('🎤 Speech status: $status');
+          if (!mounted) return;
+          
+          // Reset error count on successful listening status
+          if (status == 'listening') {
+            _consecutiveErrors = 0;
+            _isRestarting = false;
         }
         
         // Only restart if we're not already restarting and conditions are met
@@ -265,6 +338,12 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
             !_isRestarting &&
             _state == _VoiceState.listening &&
             _consecutiveErrors < _maxConsecutiveErrors) {
+
+          if (_shouldUseBackendStt()) {
+            debugPrint('🎤 Switching current session to backend Google STT');
+            _startBackendSttRecording();
+            return;
+          }
           
           if (_recognizedText.isNotEmpty) {
             debugPrint('🎤 Status notListening with text, treating as final and processing...');
@@ -275,20 +354,31 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
             debugPrint('🎤 Status notListening, will restart...');
             _restartListening();
           }
-        }
-      },
-    );
-    debugPrint('🎤 Speech available: $_speechAvailable');
-    
-    // Query available locales from device
-    if (_speechAvailable) {
-      _availableLocales = await _speech.locales();
-      debugPrint('🎤 Available locales: ${_availableLocales.map((l) => l.localeId).join(', ')}');
+          }
+        },
+      );
       
-      // Log which of our target languages are available
-      for (final entry in _languageCodes.entries) {
-        final available = _isLocaleAvailable(entry.value);
-        debugPrint('🎤 ${entry.key} (${entry.value}): ${available ? "✓ available" : "✗ NOT available"}');
+      debugPrint('🎤 Speech initialized successfully: $_speechAvailable');
+      
+      // Query available locales from device
+      if (_speechAvailable) {
+        _availableLocales = await _speech.locales();
+        debugPrint('🎤 Found ${_availableLocales.length} available locales');
+        debugPrint('🎤 Available locales: ${_availableLocales.map((l) => l.localeId).join(', ')}');
+        
+        // Log which of our target languages are available
+        for (final entry in _languageCodes.entries) {
+          final available = _isLocaleAvailable(entry.value);
+          final bestMatch = available ? _getBestLocale(entry.value) : 'none';
+          debugPrint('🎤 ${entry.key} (${entry.value}): ${available ? "✓ available → $bestMatch" : "✗ NOT available"}');
+        }
+      }
+    } catch (e) {
+      debugPrint('🎤 Error initializing speech recognition: $e');
+      _speechAvailable = false;
+      if (Platform.isAndroid && Environment.useBackendApi) {
+        _forceBackendStt = true;
+        debugPrint('🎤 Speech init failed on Android, forcing backend Google STT');
       }
     }
     
@@ -300,12 +390,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     final AudioContext audioContext = AudioContext(
       iOS: AudioContextIOS(
         category: AVAudioSessionCategory.playback,
-        options: const {
-          AVAudioSessionOptions.defaultToSpeaker,
-          AVAudioSessionOptions.allowAirPlay,
-          AVAudioSessionOptions.allowBluetooth,
-          AVAudioSessionOptions.allowBluetoothA2DP,
-        },
+        options: const {},
       ),
       android: AudioContextAndroid(
         isSpeakerphoneOn: true,
@@ -481,10 +566,22 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   }
 
   Future<void> _startListening() async {
-    if (!_speechAvailable) {
+    if (!_speechAvailable && !_shouldUseBackendStt()) {
       _showError('Speech recognition not available');
       return;
     }
+
+    // Verify microphone permission before starting (critical for Android)
+    final micStatus = await Permission.microphone.status;
+    if (!micStatus.isGranted) {
+      debugPrint('🎤 ✗ Microphone permission not granted, requesting...');
+      final newStatus = await Permission.microphone.request();
+      if (!newStatus.isGranted) {
+        _showError('Microphone permission required for voice assistant');
+        return;
+      }
+    }
+    debugPrint('🎤 ✓ Microphone permission verified');
 
     HapticFeedback.heavyImpact();
     _userStoppedManually = false;
@@ -493,7 +590,12 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     _isRestarting = false;
     
     // Stop any existing speech session first
-    await _speech.stop();
+    try {
+      await _speech.cancel();
+      await _speech.stop();
+    } catch (e) {
+      debugPrint('🎤 Error stopping previous session: $e');
+    }
     
     setState(() {
       _state = _VoiceState.listening;
@@ -505,12 +607,177 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     // Smoothly ramp up sphere intensity
     _intensityController.animateTo(1.0);
 
-    // Small delay to ensure audio session is ready
-    await Future.delayed(const Duration(milliseconds: 100));
+    // Android needs more time to initialize audio session
+    final initDelay = Platform.isAndroid ? 300 : 100;
+    await Future.delayed(Duration(milliseconds: initDelay));
+    debugPrint('🎤 Audio session ready after ${initDelay}ms delay');
+
+    // Force Google STT on backend when local Android STT is unsupported/unstable.
+    if (_shouldUseBackendStt()) {
+      await _startBackendSttRecording();
+      return;
+    }
     
     if (!_isInListeningSession || !mounted) return;
     
     await _beginListenCycle();
+  }
+
+  bool _shouldUseBackendStt() {
+    if (!Platform.isAndroid) return false;
+    if (!Environment.useBackendApi) return false;
+
+    if (_forceBackendStt) return true;
+
+    // If locale isn't supported on device, backend Google STT is mandatory.
+    final localeSupported = _isLocaleAvailable(_selectedLanguage);
+    if (!localeSupported) {
+      debugPrint('🎤 Locale $_selectedLanguage not supported on device, switching to backend STT');
+      return true;
+    }
+
+    return false;
+  }
+
+  Future<void> _startBackendSttRecording() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+
+      if (!authProvider.isAuthenticated) {
+        debugPrint('🎤 Backend STT unavailable: user not authenticated, using device STT');
+        await _beginListenCycle();
+        return;
+      }
+
+      final hasPermission = await _backendRecorder.hasPermission();
+      if (!hasPermission) {
+        _showError('Microphone permission required for voice assistant');
+        setState(() {
+          _state = _VoiceState.idle;
+          _pulseController.stop();
+        });
+        _intensityController.animateTo(0);
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final path = '${tempDir.path}/backend_stt_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+      await _backendRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+
+      _isRecordingForBackendStt = true;
+      debugPrint('🎤 Backend STT recording started: $path');
+
+      // Auto-stop to avoid indefinite recording in case status callbacks glitch.
+      _backendSttAutoStopTimer?.cancel();
+      _backendSttAutoStopTimer = Timer(const Duration(seconds: 12), () {
+        if (mounted && _isRecordingForBackendStt) {
+          debugPrint('🎤 Backend STT auto-stop triggered');
+          _stopListening();
+        }
+      });
+    } catch (e) {
+      debugPrint('🎤 Failed to start backend STT recording: $e');
+      _showError('Unable to start voice recording. Please try again.');
+      setState(() {
+        _state = _VoiceState.idle;
+        _pulseController.stop();
+      });
+      _intensityController.animateTo(0);
+    }
+  }
+
+  Future<void> _stopBackendSttAndTranscribe() async {
+    _backendSttAutoStopTimer?.cancel();
+    final authProvider = context.read<AuthProvider>();
+
+    try {
+      final path = await _backendRecorder.stop();
+      _isRecordingForBackendStt = false;
+
+      if (path == null) {
+        _showError('Could not capture voice. Please try again.');
+        setState(() {
+          _state = _VoiceState.idle;
+          _pulseController.stop();
+        });
+        _intensityController.animateTo(0);
+        return;
+      }
+
+      final file = File(path);
+      if (!await file.exists()) {
+        _showError('Voice recording file not found. Please try again.');
+        setState(() {
+          _state = _VoiceState.idle;
+          _pulseController.stop();
+        });
+        _intensityController.animateTo(0);
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      if (bytes.length < 2048) {
+        _showError('Could not hear speech clearly. Please speak louder and try again.');
+        setState(() {
+          _state = _VoiceState.idle;
+          _pulseController.stop();
+        });
+        _intensityController.animateTo(0);
+        return;
+      }
+
+      setState(() => _state = _VoiceState.thinking);
+
+      final result = await authProvider.voiceApiService.transcribe(
+        audioData: bytes,
+        language: _shortLangCode,
+        encoding: 'LINEAR16',
+        sampleRate: 16000,
+      );
+
+      final transcript = result.transcript.trim();
+      if (transcript.isEmpty) {
+        _showError('No speech detected. Please try again.');
+        setState(() {
+          _state = _VoiceState.idle;
+          _pulseController.stop();
+        });
+        _intensityController.animateTo(0);
+        return;
+      }
+
+      debugPrint('🎤 Backend STT transcript: "$transcript" (confidence: ${result.confidence})');
+      _localSttFailureCount = 0;
+      setState(() {
+        _recognizedText = transcript;
+      });
+
+      await _processVoiceInput();
+    } on VoiceApiException catch (e) {
+      debugPrint('🎤 Backend STT API error: $e');
+      _showError('Speech transcription failed. Please try again.');
+      setState(() {
+        _state = _VoiceState.idle;
+        _pulseController.stop();
+      });
+      _intensityController.animateTo(0);
+    } catch (e) {
+      debugPrint('🎤 Backend STT error: $e');
+      _showError('Voice transcription failed. Please try again.');
+      setState(() {
+        _state = _VoiceState.idle;
+        _pulseController.stop();
+      });
+      _intensityController.animateTo(0);
+    }
   }
 
   /// Core listen call extracted so it can be invoked on first start
@@ -518,17 +785,28 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   Future<void> _beginListenCycle() async {
     // Get the best available locale for the selected language
     final effectiveLocale = _getBestLocale(_selectedLanguage);
-    debugPrint('🎤 Starting listen cycle, target: $_selectedLanguage, using: $effectiveLocale');
+    debugPrint('🎤 Starting listen cycle');
+    debugPrint('🎤   Target language: $_selectedLanguage');
+    debugPrint('🎤   Effective locale: $effectiveLocale');
+    debugPrint('🎤   Platform: ${Platform.isAndroid ? "Android" : "iOS"}');
+    debugPrint('🎤   Available locales: ${_availableLocales.map((l) => l.localeId).take(5).join(", ")}...');
     
     try {
       await _speech.listen(
         onResult: (result) {
-          debugPrint('🎤 Result: "${result.recognizedWords}", final: ${result.finalResult}');
+          debugPrint('🎤 Result: "${result.recognizedWords}", final: ${result.finalResult}, confidence: ${result.confidence}');
           // Reset error counter on successful result
-          _consecutiveErrors = 0;
-          setState(() {
-            _recognizedText = result.recognizedWords;
-          });
+          if (_consecutiveErrors > 0) {
+            debugPrint('🎤 Resetting error count from $_consecutiveErrors to 0');
+            _consecutiveErrors = 0;
+          }
+          
+          if (result.recognizedWords.isNotEmpty) {
+            setState(() {
+              _recognizedText = result.recognizedWords;
+            });
+          }
+          
           if (result.finalResult && _recognizedText.isNotEmpty) {
             debugPrint('🎤 Final result received, processing...');
             _isInListeningSession = false;
@@ -544,16 +822,26 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
           });
         },
         localeId: effectiveLocale,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
+        listenFor: Platform.isAndroid 
+            ? const Duration(seconds: 60)  // Longer timeout for Android
+            : const Duration(seconds: 30),
+        pauseFor: Platform.isAndroid
+            ? const Duration(seconds: 5)   // Longer pause detection for Android
+            : const Duration(seconds: 3),
         partialResults: true,
         cancelOnError: false,
         listenMode: stt.ListenMode.dictation,
       );
-      debugPrint('🎤 Listen call completed');
-    } catch (e) {
+      debugPrint('🎤 Listen call completed successfully');
+    } catch (e, stackTrace) {
       debugPrint('🎤 Listen exception: $e');
+      debugPrint('🎤 Stack trace: $stackTrace');
       _consecutiveErrors++;
+      
+      // On Android, try with system default if locale failed
+      if (Platform.isAndroid && e.toString().contains('locale')) {
+        debugPrint('🎤 Locale error detected, will retry with system default on next cycle');
+      }
     }
   }
 
@@ -569,13 +857,15 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
       // Cancel and stop current session first
       await _speech.cancel();
       await _speech.stop();
-    } catch (_) {
-      // Ignore errors during cancel/stop
+    } catch (e) {
+      debugPrint('🎤 Error stopping speech: $e');
     }
 
-    // Use progressively longer delay for retries (500ms, 750ms, 1000ms, etc.)
-    final delayMs = 500 + (_consecutiveErrors * 250);
-    debugPrint('🎤 Waiting ${delayMs}ms before restart...');
+    // Use progressively longer delay for retries
+    // Android needs more time to release audio resources
+    final baseDelay = Platform.isAndroid ? 800 : 500;
+    final delayMs = baseDelay + (_consecutiveErrors * 300);
+    debugPrint('🎤 Waiting ${delayMs}ms before restart (Android: ${Platform.isAndroid})...');
     
     await Future.delayed(Duration(milliseconds: delayMs));
     
@@ -585,6 +875,12 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     }
     
     _isRestarting = false; // Reset before starting new cycle
+
+    if (_shouldUseBackendStt()) {
+      await _startBackendSttRecording();
+      return;
+    }
+
     _beginListenCycle();
   }
 
@@ -592,11 +888,27 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     _userStoppedManually = true;
     _isInListeningSession = false;
     _isRestarting = false;
+
+    if (_isRecordingForBackendStt) {
+      await _stopBackendSttAndTranscribe();
+      return;
+    }
+
     await _speech.cancel();
     await _speech.stop();
     if (_recognizedText.isNotEmpty) {
+      _localSttFailureCount = 0;
       _processVoiceInput();
     } else {
+      if (Platform.isAndroid) {
+        _localSttFailureCount++;
+        debugPrint('🎤 Local STT empty result count: $_localSttFailureCount');
+        if (_localSttFailureCount >= _maxLocalSttFailuresBeforeBackend) {
+          _forceBackendStt = true;
+          debugPrint('🎤 Switching to backend Google STT due to repeated local STT failures');
+        }
+      }
+
       // Apple-style: gracefully fade out, then set idle
       setState(() => _soundLevel = 0);
       _intensityController.animateTo(0).then((_) {
@@ -679,14 +991,20 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
 
       // Synthesize speech using backend TTS
       debugPrint('🔊 Synthesizing speech for language: $lang, text length: ${aiResponse.length}');
-      final synthesisResult = await voiceApi.synthesize(
-        text: aiResponse,
-        language: lang,
-      );
-      debugPrint('🔊 Synthesis complete: ${synthesisResult.audioContent.length} bytes, format: ${synthesisResult.audioFormat}');
+      try {
+        final synthesisResult = await voiceApi.synthesize(
+          text: aiResponse,
+          language: lang,
+        );
+        debugPrint('🔊 Synthesis complete: ${synthesisResult.audioContent.length} bytes, format: ${synthesisResult.audioFormat}');
 
-      // Play the audio response
-      await _playAudioResponse(synthesisResult.audioContent, synthesisResult.audioFormat);
+        // Play the audio response
+        await _playAudioResponse(synthesisResult.audioContent, synthesisResult.audioFormat);
+      } catch (audioError) {
+        // If TTS or audio playback fails, fall back to local TTS with the SAME response text
+        debugPrint('🔊 Backend TTS/playback failed: $audioError');
+        await _fallbackToLocalTts();
+      }
       
     } on VoiceApiException catch (e) {
       _showError('Voice API error: ${e.message}');
@@ -746,6 +1064,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   /// Play audio response from backend TTS
   Future<void> _playAudioResponse(Uint8List audioData, String format) async {
     debugPrint('🔊 Playing audio response: ${audioData.length} bytes, format: $format');
+    debugPrint('🔊 Current state: $_state, mounted: $mounted');
 
     if (audioData.length < 100) {
       debugPrint('🔊 Audio data too small, falling back to local TTS');
@@ -792,35 +1111,47 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
       debugPrint('🔊 Audio saved to: ${audioFile.path}');
 
       // Re-apply AudioContext right before playing to fight iOS session resets
-      await AudioPlayer.global.setAudioContext(
-        AudioContext(
-          iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.playback,
-            options: const {
-              AVAudioSessionOptions.defaultToSpeaker,
-              AVAudioSessionOptions.allowAirPlay,
-              AVAudioSessionOptions.allowBluetooth,
-              AVAudioSessionOptions.allowBluetoothA2DP,
-            },
+      debugPrint('🔊 Setting audio context...');
+      try {
+        await AudioPlayer.global.setAudioContext(
+          AudioContext(
+            iOS: AudioContextIOS(
+              category: AVAudioSessionCategory.playback,
+              options: const {
+                AVAudioSessionOptions.defaultToSpeaker,
+                AVAudioSessionOptions.allowAirPlay,
+                AVAudioSessionOptions.allowBluetooth,
+                AVAudioSessionOptions.allowBluetoothA2DP,
+              },
+            ),
+            android: AudioContextAndroid(
+              isSpeakerphoneOn: true,
+              stayAwake: true,
+              contentType: AndroidContentType.speech,
+              usageType: AndroidUsageType.media,
+              audioFocus: AndroidAudioFocus.gain,
+            ),
           ),
-          android: AudioContextAndroid(
-            isSpeakerphoneOn: true,
-            stayAwake: true,
-            contentType: AndroidContentType.speech,
-            usageType: AndroidUsageType.media,
-            audioFocus: AndroidAudioFocus.gain,
-          ),
-        ),
-      );
+        );
+        debugPrint('🔊 Audio context set successfully');
+      } catch (contextError) {
+        debugPrint('🔊 Warning: Failed to set audio context: $contextError');
+      }
 
       await _audioPlayer.play(DeviceFileSource(audioFile.path));
       debugPrint('🔊 Audio playback started');
+      
+      // Verify file exists and has content
+      final fileExists = await audioFile.exists();
+      final fileSize = await audioFile.length();
+      debugPrint('🔊 Audio file exists: $fileExists, size: $fileSize bytes');
 
       // Clean up old audio files in background
       _cleanupOldAudioFiles(tempDir);
     } catch (e) {
       debugPrint('🔊 Audio playback error: $e');
-      await _fallbackToLocalTts();
+      // Re-throw so outer catch can handle fallback
+      rethrow;
     }
   }
   
@@ -915,6 +1246,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
   @override
   void dispose() {
     debugPrint('🎤 Voice assistant session ended, clearing context: $_conversationId');
+    _backendSttAutoStopTimer?.cancel();
     _playerCompleteSub?.cancel();
     _playerStateSub?.cancel();
     _sphereController.dispose();
@@ -922,6 +1254,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
     _aiSpeakController.dispose();
     _intensityController.dispose();
     _audioPlayer.dispose();
+    _backendRecorder.dispose();
     _speech.stop();
     _tts.stop();
     super.dispose();

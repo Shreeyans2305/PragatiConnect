@@ -16,12 +16,16 @@ class Environment {
     if (!kIsWeb && Platform.isIOS) {
       // Replace localhost with 127.0.0.1 for iOS simulator
       // For real devices, you'll need to set the actual IP in .env
-      return envUrl.replaceAll('localhost', '127.0.0.1');
+      return envUrl
+          .replaceAll('localhost', '127.0.0.1')
+          .replaceAll('10.0.2.2', '127.0.0.1');
     }
     
     // Android emulator uses 10.0.2.2 to reach host localhost
     if (!kIsWeb && Platform.isAndroid) {
-      return envUrl.replaceAll('localhost', '10.0.2.2');
+      return envUrl
+          .replaceAll('localhost', '10.0.2.2')
+          .replaceAll('127.0.0.1', '10.0.2.2');
     }
     
     return envUrl;
@@ -46,7 +50,8 @@ class Environment {
   static Future<void> initialize() async {
     await dotenv.load(fileName: '.env');
     debugPrint('🔧 Environment loaded:');
-    debugPrint('   API_BASE_URL: ${dotenv.env['API_BASE_URL']}');
+    debugPrint('   API_BASE_URL (raw): ${dotenv.env['API_BASE_URL']}');
+    debugPrint('   API_BASE_URL (actual): $apiBaseUrl');
     debugPrint('   USE_BACKEND_API: ${dotenv.env['USE_BACKEND_API']}');
     debugPrint('   useBackendApi getter: $useBackendApi');
   }
