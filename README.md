@@ -1,364 +1,202 @@
 # Pragati Connect
 
-> **Unified Economic Assistant for India's Informal Workforce**
+> Unified AI assistant for India’s informal workforce, focused on practical access through mobile and voice-first interfaces.
 
-Pragati Connect bridges the gap between informal workers (artisans, maids, daily wage laborers) and the formal economy through fair price discovery, negotiation support, and government scheme access.
-
----
-
-## 🎯 The Problem
-
-India's 450+ million informal workers operate in an economic blind spot:
-- **Information Asymmetry:** No access to fair price discovery or wage benchmarks
-- **Exploitation:** Middlemen and clients leverage knowledge gaps to underpay
-- **Missed Opportunities:** Unaware of government welfare schemes worth ₹6,000-₹2,50,000 annually
-- **Confidence Gap:** Lack negotiation skills and practice for formal interactions
-
-**Impact:** Fair price discovery alone can increase artisan income by 15-30%.
+Pragati Connect helps workers (artisans, daily wage workers, domestic workers, small service providers) with:
+- fair pricing support,
+- voice-based assistance,
+- government scheme discovery,
+- and business enablement tools.
 
 ---
 
-## 💡 The Solution
+## ✅ Current Product Status (What is Working Now)
 
-Pragati Connect provides three accessible interfaces powered by a unified AI backend:
+This repository currently ships **two active user-facing products**:
 
-### 1. 🎙️ Voice Negotiator (Phone Call) - **P0 Core Feature**
-- **Access:** Standard phone call to toll-free number
-- **Features:**
-  - Real-time wage queries in local language (Hindi, Tamil, Telugu, Bengali)
-  - Interactive negotiation practice with AI client simulation
-  - Confidence-building through realistic scenarios
-- **Technology:** Vapi.ai + Deepgram (STT) + ElevenLabs (TTS)
-- **Latency:** <2 seconds end-to-end response time
-
-### 2. 💬 Opportunity Alert (WhatsApp) - **P0 Core Feature**
-- **Access:** WhatsApp chatbot on user's existing number
-- **Features:**
-  - Proactive notifications about relevant government schemes
-  - Eligibility matching based on trade, location, and profile
-  - Conversational Q&A about scheme details and application process
-- **Rate Limiting:** Max 2 notifications per week to avoid spam
-
-### 3. 📱 Visual Price Estimator (Mobile App) - **P1 Future Enhancement**
-- **Access:** Mobile application (React Native/Flutter)
-- **Features:**
-  - Photo-based product analysis using multimodal AI
-  - Fair market price estimates with regional context
-  - Voice-guided explanations in local language
-  - Offline caching of recent estimates
-- **Technology:** Amazon Bedrock (Claude 3.5 Sonnet) for vision analysis
+1. **Mobile App (Flutter, iOS + Android)** — production-style feature set
+2. **On-Call Interface (Web prototype)** — browser-based voice call experience, designed as a toll-free-call prototype
 
 ---
 
-## 🏗️ Architecture
+## 📱 Mobile App (Flutter)
 
-### High-Level Design
+Location: [MobileApp](MobileApp)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     User Interfaces                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Phone Call   │  │  WhatsApp    │  │  Mobile App  │      │
-│  │  (Vapi.ai)   │  │   Chatbot    │  │   (Future)   │      │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
-└─────────┼──────────────────┼──────────────────┼─────────────┘
-          │                  │                  │
-          └──────────────────┼──────────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  AWS API Gateway │
-                    └────────┬────────┘
-                             │
-          ┌──────────────────┼──────────────────┐
-          │                  │                  │
-    ┌─────▼─────┐     ┌─────▼─────┐     ┌─────▼─────┐
-    │  Voice    │     │ WhatsApp  │     │  Profile  │
-    │  Handler  │     │  Handler  │     │  Manager  │
-    │  Lambda   │     │  Lambda   │     │  Lambda   │
-    └─────┬─────┘     └─────┬─────┘     └─────┬─────┘
-          │                  │                  │
-          └──────────────────┼──────────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  Central Brain   │
-                    │  (Orchestration) │
-                    └────────┬────────┘
-                             │
-          ┌──────────────────┼──────────────────┐
-          │                  │                  │
-    ┌─────▼─────┐     ┌─────▼─────┐     ┌─────▼─────┐
-    │  Bedrock  │     │ Knowledge │     │ DynamoDB  │
-    │   LLM     │     │   Base    │     │  Profiles │
-    │  (Claude) │     │   (RAG)   │     │  & Data   │
-    └───────────┘     └───────────┘     └───────────┘
-```
+### Implemented features
 
-### Technology Stack
+- **User onboarding + authentication** (OTP-backed API flow)
+- **Dashboard + profile management**
+- **AI Chat assistant**
+- **Voice Assistant**
+  - speech input
+  - AI response generation
+  - spoken response playback
+- **Government Schemes module**
+  - list/search/filter schemes
+  - scheme details view
+  - **official links open externally**
+- **Price Estimator**
+  - image upload
+  - AI-driven estimate response
+  - estimate history
+- **Business Boost tools**
+  - AI-generated business support content
+- **Multilingual experience** for major Indian languages
 
-| Layer | Technology | Rationale |
-|-------|-----------|-----------|
-| **Backend** | Python + FastAPI | Rapid development, async support, AWS Lambda native |
-| **AI/LLM** | Amazon Bedrock (Claude 3.5 Sonnet) | Best reasoning, AWS-native, low latency from India |
-| **Knowledge Base** | Knowledge Bases for Bedrock (RAG) | Managed semantic search for government schemes |
-| **Voice** | Vapi.ai + Deepgram + ElevenLabs | Production-ready, <2s latency, multilingual |
-| **Database** | DynamoDB | Serverless, single-digit ms latency, auto-scaling |
-| **Storage** | S3 | Durable image storage with lifecycle policies |
-| **Compute** | AWS Lambda | Zero infrastructure, auto-scaling, pay-per-use |
-| **API** | AWS API Gateway | RESTful endpoints, validation, throttling |
+### Mobile tech stack
 
----
+- Flutter + Dart
+- Provider for state management
+- Backend APIs (FastAPI)
+- AI via Amazon Bedrock (Nova/Claude model configuration)
+- Speech pipeline integrated via backend + device/client flow
 
-## 👥 User Personas
-
-### Radha the Weaver (38, Tamil Nadu)
-- **Trade:** Handloom saree weaving
-- **Challenge:** Middlemen offer ₹800 for sarees worth ₹2,500
-- **Tech Access:** Feature phone (primary), occasional smartphone via family
-- **Usage:** Visual Price Estimator (via daughter's phone) + WhatsApp alerts for weaver schemes
-
-### Raju the Carpenter (45, Uttar Pradesh)
-- **Trade:** Furniture carpentry and home repairs
-- **Challenge:** Accepts low rates (₹400/day) due to negotiation uncertainty
-- **Tech Access:** Basic feature phone with voice capability
-- **Usage:** Voice Negotiator for wage queries and practice + WhatsApp for housing schemes
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.11+
-- AWS Account with Bedrock access
-- Vapi.ai account for voice integration
-- WhatsApp Business API access
-
-### Installation
+### Run mobile app locally
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/pragati-connect.git
-cd pragati-connect
+cd MobileApp
+flutter pub get
+flutter run
+```
 
-# Install dependencies
+Build Android APK:
+
+```bash
+cd MobileApp
+flutter build apk
+```
+
+Generated file:
+- [MobileApp/build/app/outputs/flutter-apk/app-release.apk](MobileApp/build/app/outputs/flutter-apk/app-release.apk)
+
+---
+
+## 📞 On-Call Interface (Web Prototype)
+
+Location: [web-call-interface](web-call-interface)
+
+Live prototype:
+- https://pragati-connect-on-call.vercel.app/
+
+This is a web implementation of the call flow while toll-free telephony integration is being productized.
+
+### Implemented features
+
+- iPhone-style call UI
+- Start/End call flow
+- Hold-to-talk microphone interaction
+- Sends voice audio to backend voice endpoint (`/api/v1/voice/query-base64`)
+- Plays AI-generated audio response
+- Conversation transcript bubbles
+- Language selection
+- Auto-auth support (with OTP fallback when needed)
+
+### Run web call interface locally
+
+```bash
+cd web-call-interface
+npm install
+npm run dev
+```
+
+---
+
+## 🧠 Backend APIs (Used by Both Interfaces)
+
+Location: [MobileApp/backend](MobileApp/backend)
+
+### Core API groups
+
+- `auth` – registration, OTP verify, token refresh
+- `profile` – user profile read/update
+- `chat` – AI messaging and related flows
+- `voice` – STT → AI → TTS pipeline (`/query`, `/query-base64`, `/transcribe`, `/synthesize`)
+- `schemes` – government scheme retrieval + Q&A
+- `price` – product image pricing/estimate APIs
+- `business` – business profile/content generation
+
+### Run backend locally
+
+```bash
+cd MobileApp/backend
 pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your AWS credentials, Vapi API key, etc.
-
-# Deploy to AWS (using Serverless Framework or SAM)
-serverless deploy
+uvicorn app.main:app --reload --port 8000
 ```
 
-### Configuration
-
-```bash
-# Configure AWS Bedrock
-aws bedrock create-knowledge-base --name pragati-schemes --region ap-south-1
-
-# Set up Vapi.ai webhook
-# Point Vapi webhook to: https://your-api-gateway-url/v1/voice-webhook
-
-# Configure WhatsApp Business API
-# Set webhook to: https://your-api-gateway-url/v1/whatsapp-webhook
-```
+API docs (local):
+- http://localhost:8000/docs
 
 ---
 
-## 📋 API Endpoints
+## 🏗️ High-Level Architecture
 
-### Core Endpoints (P0)
+```text
+Flutter Mobile App ───────┐
+                          ├──> AWS API Gateway / FastAPI backend
+React Web Call Interface ─┘
 
-#### POST /api/v1/voice-webhook
-Handle Vapi.ai voice call events
-```json
-{
-  "transcript": "Main carpenter hoon",
-  "user_phone": "+919876543210",
-  "language": "hi"
-}
-```
+Backend services:
+- Auth + profile orchestration
+- Voice pipeline (audio in/out)
+- Chat + scheme assistance
+- Price estimation
+- Business tools
 
-#### POST /api/v1/whatsapp-webhook
-Process incoming WhatsApp messages
-```json
-{
-  "from": "+919876543210",
-  "message": "Kaise apply karein?",
-  "message_type": "text"
-}
-```
-
-#### POST /api/v1/users/profile
-Create or update user profile
-```json
-{
-  "phone": "+919876543210",
-  "primary_trade": "carpenter",
-  "location": {"state": "Uttar Pradesh", "district": "Lucknow"},
-  "language": "hi",
-  "whatsapp_opt_in": true
-}
-```
-
-### Future Enhancement (P1)
-
-#### POST /api/v1/analyze-image
-Analyze product image for price estimation
-```json
-{
-  "user_id": "+919876543210",
-  "image": "base64_encoded_image",
-  "language": "ta"
-}
+Infra + AI:
+- AWS Lambda deployment pattern (FastAPI via Mangum)
+- DynamoDB for users/conversations/estimates
+- S3 for media objects
+- Amazon Bedrock for LLM reasoning (Nova/Claude)
 ```
 
 ---
 
-## 🧪 Testing
+## 🧪 Practical Testing Checklist
 
-### Run Tests
+### Mobile app testing
 
-```bash
-# Unit tests
-pytest tests/unit/ -v
+1. Launch app and authenticate
+2. Open Schemes list and navigate to a scheme detail
+3. Tap official scheme link (should open browser)
+4. Test Voice Assistant query + spoken response
+5. Test Price Estimator with sample image
+6. Test AI Chat and Business Boost outputs
 
-# Property-based tests (100 iterations each)
-pytest tests/property/ -v --hypothesis-show-statistics
+### Web call testing
 
-# Integration tests
-pytest tests/integration/ -v
-
-# Coverage report
-pytest --cov=src --cov-report=html
-```
-
-### Testing Strategy
-
-- **Unit Tests:** Specific examples, edge cases, error conditions
-- **Property Tests:** Universal properties across randomized inputs (using Hypothesis)
-- **Integration Tests:** End-to-end flows with mocked external services
-
-**Priority:**
-- P0: Voice webhook, WhatsApp handler, profile management
-- P1: Image analysis, price estimation
+1. Open live site: https://pragati-connect-on-call.vercel.app/
+2. Grant microphone access
+3. Start call
+4. Use hold-to-talk and send a query
+5. Verify transcript + audio response
+6. End call
 
 ---
 
-## 🌍 Language Support
+## 📂 Repository Structure (Key Paths)
 
-Supported languages for voice and text:
-- **Hindi (hi):** Primary language
-- **Tamil (ta):** South India
-- **Telugu (te):** Andhra Pradesh, Telangana
-- **Bengali (bn):** West Bengal, Bangladesh
-
-All interfaces automatically adapt to user's language preference stored in profile.
+- [MobileApp](MobileApp) — Flutter client
+- [MobileApp/backend](MobileApp/backend) — FastAPI backend
+- [web-call-interface](web-call-interface) — React on-call prototype
+- [design.md](design.md) — detailed system design
+- [requirements.md](requirements.md) — product/functional requirements
 
 ---
 
-## 📊 Key Features
+## 🚀 Roadmap Snapshot
 
-### Voice Negotiator
-✅ Real-time wage queries (<2s latency)  
-✅ Negotiation practice with AI simulation  
-✅ Multi-language support (4 languages)  
-✅ Context-aware conversations (5-minute memory)  
-✅ SMS summary of key points (optional)
-
-### Opportunity Alert
-✅ Automated scheme matching based on profile  
-✅ Proactive WhatsApp notifications (max 2/week)  
-✅ Conversational Q&A about eligibility  
-✅ Application process guidance  
-✅ Deadline tracking and reminders
-
-### Visual Price Estimator (P1)
-✅ Photo-based product analysis  
-✅ Fair market price estimates  
-✅ Voice-guided explanations  
-✅ Offline caching (last 10 estimates)  
-✅ Regional market context
-
----
-
-## 🔒 Security & Privacy
-
-- **Encryption:** TLS 1.3 in transit, AWS KMS at rest
-- **Data Residency:** All data stored in AWS India regions (Mumbai/Hyderabad)
-- **Consent Management:** Explicit opt-in for WhatsApp notifications
-- **Data Deletion:** User-initiated via WhatsApp command `/delete-my-data`
-- **No Third-Party Sharing:** User data never shared without explicit consent
-
----
-
-## 📈 Success Metrics
-
-- **Price Fairness:** 20%+ increase in user earnings after using price estimates
-- **Scheme Awareness:** 50%+ discover relevant schemes within first week
-- **Engagement:** 60%+ return for second interaction within 7 days
-- **Voice Satisfaction:** 4+/5 rating for ease of use by low-literacy users
-
----
-
-## 🛣️ Roadmap
-
-### Phase 1: MVP (P0) - Current Focus
-- [x] Voice Negotiator with wage queries
-- [x] WhatsApp scheme notifications
-- [x] User profile management
-- [x] Knowledge base for government schemes
-- [ ] Production deployment
-
-### Phase 2: Enhancement (P1)
-- [ ] Visual Price Estimator mobile app
-- [ ] Advanced negotiation scenarios (3 personality types)
-- [ ] Analytics dashboard
-- [ ] Offline price estimate caching
-
-### Phase 3: Scale (Future)
-- [ ] Direct marketplace integration
-- [ ] Payment processing
-- [ ] Video-based skill tutorials
-- [ ] Community forum
-- [ ] Government portal integration
-
----
-
-
-### Development Setup
-
-```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
-
-# Run linter
-flake8 src/
-
-# Format code
-black src/
-
-# Type checking
-mypy src/
-```
+- Toll-free phone number integration for production call flow
+- Broader scheme intelligence and personalization
+- Stronger offline and low-connectivity behavior
+- Expanded analytics and deployment hardening
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+MIT License
 
 ---
 
-## 🙏 Acknowledgments
-
-- **Target Users:** India's 450+ million informal workers
-- **Government Schemes:** Data sourced from official government portals
-- **Voice Technology:** Powered by Vapi.ai, Deepgram, and ElevenLabs
-- **AI Models:** Amazon Bedrock (Claude 3.5 Sonnet by Anthropic)
-
----
-
-
-**Built with ❤️ for India's backbone workforce**
+Built with focus on accessibility, local-language support, and real-world deployability.
