@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../l10n/app_strings.dart';
-import '../services/api_service.dart';
-import '../services/gemini_service.dart';
-import '../providers/auth_provider.dart';
-import '../config/environment.dart';
+import '../services/schemes_data_service.dart';
 import 'scheme_detail_screen.dart';
 
 class SchemesScreen extends StatefulWidget {
@@ -17,54 +13,21 @@ class SchemesScreen extends StatefulWidget {
 }
 
 class _SchemesScreenState extends State<SchemesScreen> {
-  final GeminiService _gemini = GeminiService();
-  final ApiService _apiService = ApiService();
+  final SchemesDataService _schemesDataService = SchemesDataService();
   List<Map<String, dynamic>> _schemes = [];
   List<Map<String, dynamic>> _filtered = [];
   bool _loading = true;
-  String _currentLang = 'en';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _currentLang = Localizations.localeOf(context).languageCode;
-      _loadSchemes();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSchemes());
   }
 
   Future<void> _loadSchemes() async {
     setState(() => _loading = true);
-    
-    List<Map<String, dynamic>> schemes;
-    
-    // Check if we should use backend API
-    final useBackend = Environment.useBackendApi;
-    final authProvider = context.read<AuthProvider>();
-    
-    debugPrint('🔧 Schemes: useBackend=$useBackend, isAuthenticated=${authProvider.isAuthenticated}');
-    
-    if (useBackend && authProvider.isAuthenticated) {
-      // Use backend API
-      try {
-        debugPrint('🔧 Schemes: Using backend API');
-        schemes = await _apiService.getSchemes(
-          authToken: authProvider.accessToken!,
-        );
-        debugPrint('🔧 Schemes: Got ${schemes.length} schemes from backend');
-      } catch (e) {
-        debugPrint('Backend schemes error: $e, falling back to Gemini');
-        schemes = await _gemini.fetchGovernmentSchemes(
-          language: _currentLang,
-        );
-      }
-    } else {
-      // Fallback to Gemini
-      debugPrint('🔧 Schemes: Using Gemini (backend disabled or not authenticated)');
-      schemes = await _gemini.fetchGovernmentSchemes(
-        language: _currentLang,
-      );
-    }
+
+    final schemes = await _schemesDataService.loadSchemes();
     
     setState(() {
       _schemes = schemes;
@@ -81,9 +44,10 @@ class _SchemesScreenState extends State<SchemesScreen> {
         _filtered = _schemes.where((s) {
           final name = (s['name'] as String).toLowerCase();
           final desc = (s['description'] as String).toLowerCase();
-          final cat = (s['category'] as String).toLowerCase();
+          final cat = (s['category'] as String? ?? '').toLowerCase();
+          final tag = (s['benefitAmount'] as String? ?? '').toLowerCase();
           final q = query.toLowerCase();
-          return name.contains(q) || desc.contains(q) || cat.contains(q);
+          return name.contains(q) || desc.contains(q) || cat.contains(q) || tag.contains(q);
         }).toList();
       }
     });
@@ -213,6 +177,7 @@ class _SchemesScreenState extends State<SchemesScreen> {
                               MaterialPageRoute(
                                 builder: (_) => SchemeDetailScreen(
                                   schemeName: scheme['name'] as String,
+                                  schemeData: scheme,
                                 ),
                               ),
                             );

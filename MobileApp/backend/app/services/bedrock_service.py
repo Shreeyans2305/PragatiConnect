@@ -9,12 +9,7 @@ class BedrockService:
     """Service for interacting with Amazon Bedrock."""
 
     def __init__(self):
-        self.client = boto3.client(
-            "bedrock-runtime",
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-        )
+        self.client = boto3.client("bedrock-runtime", region_name=settings.aws_region)
         self.model_id = settings.bedrock_model_id
         # Detect if using Nova or Claude model
         self.is_nova = "nova" in self.model_id.lower()

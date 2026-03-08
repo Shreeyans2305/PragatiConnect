@@ -92,9 +92,18 @@ class PragatiConnectApp extends StatelessWidget {
           '/settings': (_) => const SettingsScreen(),
           '/schemes': (_) => const SchemesScreen(),
           '/ai-chat': (_) => const AiChatScreen(),
-          '/scheme-detail': (_) => SchemeDetailScreen(
-                schemeName: settings.arguments as String? ?? '',
-              ),
+          '/scheme-detail': (_) {
+            final arg = settings.arguments;
+            if (arg is Map<String, dynamic>) {
+              return SchemeDetailScreen(
+                schemeName: (arg['name'] as String?) ?? '',
+                schemeData: arg,
+              );
+            }
+            return SchemeDetailScreen(
+              schemeName: arg as String? ?? '',
+            );
+          },
         };
 
         final builder = routes[settings.name];

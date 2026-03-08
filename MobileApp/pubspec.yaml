@@ -43,6 +43,7 @@ flutter:
 
   assets:
     - .env
+    - indian_schemes_informal_workers_expanded.json
 
 flutter_launcher_icons:
   android: true

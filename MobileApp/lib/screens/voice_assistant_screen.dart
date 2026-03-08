@@ -1363,7 +1363,6 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen>
             _LanguageSelector(
               selectedLanguage: _selectedLanguage,
               isDark: isDark,
-              availableLocales: _availableLocales,
               onLanguageChanged: (newLang) {
                 HapticFeedback.selectionClick();
                 setState(() {
@@ -1543,13 +1542,11 @@ class _LanguageSelector extends StatelessWidget {
   final String selectedLanguage;
   final bool isDark;
   final ValueChanged<String> onLanguageChanged;
-  final List<stt.LocaleName> availableLocales;
   
   const _LanguageSelector({
     required this.selectedLanguage,
     required this.isDark,
     required this.onLanguageChanged,
-    required this.availableLocales,
   });
 
   static const Map<String, String> _languageLabels = {
@@ -1567,19 +1564,6 @@ class _LanguageSelector extends StatelessWidget {
     'en-IN', 'hi-IN', 'mr-IN', 'ta-IN', 'te-IN', 'bn-IN', 'gu-IN', 'pa-IN'
   ];
 
-  /// Check if a locale is available on device
-  bool _isLocaleAvailable(String localeId) {
-    if (availableLocales.isEmpty) return true; // Assume available if not loaded yet
-    final langPrefix = localeId.split('-').first.toLowerCase();
-    return availableLocales.any((l) {
-      final id = l.localeId.toLowerCase();
-      return id == localeId.toLowerCase() || 
-             id.startsWith('$langPrefix-') || 
-             id.startsWith('${langPrefix}_') ||
-             id == langPrefix;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final fgColor = isDark ? Colors.white70 : Colors.black54;
@@ -1591,15 +1575,12 @@ class _LanguageSelector extends StatelessWidget {
       onSelected: onLanguageChanged,
       itemBuilder: (context) => _languageOrder.map((lang) {
         final isSelected = lang == selectedLanguage;
-        final isAvailable = _isLocaleAvailable(lang);
         return PopupMenuItem<String>(
           value: lang,
           child: Row(
             children: [
               if (isSelected)
                 const Icon(Icons.check, size: 16, color: Colors.green)
-              else if (!isAvailable)
-                Icon(Icons.mic_off_rounded, size: 16, color: Colors.orange.shade400)
               else
                 const SizedBox(width: 16),
               const SizedBox(width: 8),
@@ -1611,17 +1592,6 @@ class _LanguageSelector extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!isAvailable)
-                Tooltip(
-                  message: 'Speech input not available.\nDownload language in device settings.',
-                  child: Text(
-                    '(no mic)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.orange.shade400,
-                    ),
-                  ),
-                ),
             ],
           ),
         );

@@ -8,18 +8,8 @@ class DynamoDBClient:
     """Client for DynamoDB operations."""
 
     def __init__(self):
-        self.client = boto3.client(
-            "dynamodb",
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-        )
-        self.resource = boto3.resource(
-            "dynamodb",
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-        )
+        self.client = boto3.client("dynamodb", region_name=settings.aws_region)
+        self.resource = boto3.resource("dynamodb", region_name=settings.aws_region)
 
     # ─── User Operations ─────────────────────────────────────────────────────
 

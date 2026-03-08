@@ -13,8 +13,6 @@ class S3Client:
         self.client = _boto3.client(
             "s3",
             region_name=region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
             config=_boto3.session.Config(
                 s3={"addressing_style": "virtual"},
                 signature_version="s3v4",

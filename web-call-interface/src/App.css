@@ -1,0 +1,422 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at top, #1e2d52 0%, #090c16 55%, #04050b 100%);
+  color: #f5f7ff;
+  overflow: hidden;
+}
+
+.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+}
+
+.iphone-shell {
+  position: relative;
+  width: min(350px, 92vw);
+  height: min(94dvh, 760px);
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.2), transparent 52%),
+    linear-gradient(145deg, #2a2f39, #151922 45%, #0a0c12);
+  border-radius: 40px;
+  padding: 10px;
+  border: 3px solid #030304;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 0 0 2px rgba(0, 0, 0, 0.92),
+    0 24px 70px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+}
+
+.side-button {
+  position: absolute;
+  width: 3px;
+  border-radius: 4px;
+  background: rgba(120, 129, 154, 0.7);
+  z-index: 2;
+}
+
+.side-button-left {
+  left: -2px;
+  top: 130px;
+  height: 72px;
+}
+
+.side-button-right {
+  right: -2px;
+  top: 164px;
+  height: 86px;
+}
+
+.dynamic-island {
+  width: 126px;
+  height: 30px;
+  margin: 0 auto 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #050505, #101013);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.island-camera {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #2f3b60 0%, #111827 42%, #05070b 80%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+}
+
+.island-sensor {
+  width: 42px;
+  height: 9px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #17181c, #2a2c33 45%, #1a1c20);
+}
+
+.screen {
+  background: linear-gradient(180deg, #3a3d44 0%, #22252d 56%, #171a20 100%);
+  border-radius: 30px;
+  padding: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.header p {
+  margin: 4px 0 0;
+  color: #b5bfd9;
+  font-size: 0.8rem;
+}
+
+.signal {
+  font-size: 0.72rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #24304b;
+  color: #9db7ff;
+}
+
+.signal.live {
+  background: rgba(43, 176, 88, 0.24);
+  color: #5ef79d;
+}
+
+.controls {
+  display: grid;
+  gap: 10px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #b9c3de;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid #2f3956;
+  background: #10172a;
+  color: #f2f5ff;
+  border-radius: 10px;
+  padding: 9px;
+}
+
+.call-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.call-button,
+.mic-button {
+  border: none;
+  padding: 11px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.call-button.start {
+  background: linear-gradient(180deg, #57dc79, #1fa74f);
+  color: #072611;
+  font-weight: 700;
+}
+
+.call-button.start:disabled {
+  background: linear-gradient(180deg, #5a6070, #464d5f);
+  color: #d7dbea;
+}
+
+.logout-button {
+  margin-top: 8px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2f5ff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.logout-button:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.precall-tip {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.22);
+  color: #d5dbeb;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.call-button.end {
+  background: linear-gradient(180deg, #ff6b7c, #da2c46);
+  color: #fff;
+  font-weight: 700;
+}
+
+.mic-button {
+  background: linear-gradient(180deg, #6a9cff, #3f68d6);
+  color: #f7f9ff;
+  font-weight: 700;
+}
+
+.mic-button.recording {
+  background: linear-gradient(180deg, #ff9f43, #ff6a00);
+}
+
+.mic-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #ff96a5;
+}
+
+.chat-log {
+  margin-top: auto;
+  display: grid;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 220px;
+  padding-right: 3px;
+}
+
+.bubble {
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.bubble span {
+  display: block;
+  font-size: 0.72rem;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.bubble p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.bubble.user {
+  background: #244189;
+}
+
+.bubble.assistant {
+  background: #1e2a44;
+}
+
+.call-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.call-top {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.call-label {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #e4e6ec;
+}
+
+.call-top h2 {
+  margin: 4px 0 0;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.call-status {
+  margin: 8px 0 0;
+  color: #bfc3cf;
+  font-size: 0.92rem;
+}
+
+.call-transcript {
+  margin: auto 0;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px;
+  max-height: 44%;
+  overflow-y: auto;
+}
+
+.transcript-role {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #a9b0c0;
+}
+
+.transcript-role.you {
+  margin-top: 12px;
+}
+
+.transcript-text {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.35;
+  color: #f3f4f8;
+}
+
+.transcript-text.user {
+  color: #d7e0ff;
+}
+
+.call-bottom-actions {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 0 4px 10px;
+}
+
+.circle-button {
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.circle-button span {
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+.circle-button.neutral {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.circle-button.speak {
+  width: 88px;
+  height: 88px;
+  background: linear-gradient(180deg, #3e7bff, #2253c2);
+}
+
+.circle-button.speak.recording {
+  background: linear-gradient(180deg, #ff9e3d, #ff6a00);
+}
+
+.circle-button.end {
+  background: linear-gradient(180deg, #ff6969, #da2f48);
+}
+
+.circle-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.welcome-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(7, 9, 14, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 14px;
+}
+
+.welcome-card {
+  width: 100%;
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(180deg, #20242d, #151923);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.welcome-card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.welcome-card p {
+  margin: 0 0 10px;
+  color: #c8cfdf;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}

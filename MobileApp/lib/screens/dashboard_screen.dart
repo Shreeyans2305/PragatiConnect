@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../l10n/app_strings.dart';
 import '../providers/auth_provider.dart';
-import '../services/gemini_service.dart';
+import '../services/schemes_data_service.dart';
 import '../widgets/app_drawer.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -198,7 +198,7 @@ class _SchemeBannerCarousel extends StatefulWidget {
 }
 
 class _SchemeBannerCarouselState extends State<_SchemeBannerCarousel> {
-  final GeminiService _gemini = GeminiService();
+  final SchemesDataService _schemesDataService = SchemesDataService();
   late final PageController _pageController;
   List<Map<String, dynamic>> _schemes = [];
   Timer? _autoScrollTimer;
@@ -213,8 +213,7 @@ class _SchemeBannerCarouselState extends State<_SchemeBannerCarousel> {
   }
 
   Future<void> _loadSchemes() async {
-    final lang = Localizations.localeOf(context).languageCode;
-    final schemes = await _gemini.fetchGovernmentSchemes(language: lang);
+    final schemes = await _schemesDataService.loadSchemes();
     if (!mounted) return;
     setState(() {
       _schemes = schemes;
@@ -352,7 +351,7 @@ class _SchemeBannerCarouselState extends State<_SchemeBannerCarousel> {
                     Navigator.pushNamed(
                       context,
                       '/scheme-detail',
-                      arguments: scheme['name'] as String,
+                      arguments: scheme,
                     );
                   },
                   child: Container(
@@ -825,12 +824,12 @@ class _ImpactMetricsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            s.get('impact_metrics'),
+            'Potential Impact for the Informal Work Sector',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 4),
           Text(
-            s.get('impact_desc'),
+            'Estimated outcomes this platform can unlock for workers and micro-businesses.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 20),
@@ -838,7 +837,7 @@ class _ImpactMetricsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _CountUpMetric(
-                  value: 20,
+                  value: 40,
                   suffix: '%',
                   label: s.get('income_uplift'),
                 ),
@@ -915,6 +914,7 @@ class _CountUpMetricState extends State<_CountUpMetric>
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
               fontWeight: FontWeight.w900,
               fontSize: 36,
+              color: Colors.green,
             ),
           ),
         ),

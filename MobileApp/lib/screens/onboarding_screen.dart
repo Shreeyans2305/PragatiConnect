@@ -226,25 +226,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isHindi = context.watch<LocaleProvider>().isHindi;
+    final authProvider = context.watch<AuthProvider>();
+    final hideSkipButton = Environment.useBackendApi && authProvider.isAuthenticated;
+    final showBottomNavigation =
+        !Environment.useBackendApi || authProvider.isAuthenticated || _currentPage > 0;
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
             // Skip button
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextButton(
-                  onPressed: _skipOnboarding,
-                  child: Text(
-                    isHindi ? 'छोड़ें' : 'Skip',
-                    style: TextStyle(color: theme.colorScheme.primary),
+            if (!hideSkipButton)
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: TextButton(
+                    onPressed: _skipOnboarding,
+                    child: Text(
+                      isHindi ? 'छोड़ें' : 'Skip',
+                      style: TextStyle(color: theme.colorScheme.primary),
+                    ),
                   ),
                 ),
               ),
-            ),
 
             // Progress indicator
             Padding(
@@ -284,42 +289,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
 
             // Navigation buttons
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                children: [
-                  if (_currentPage > 0)
+            if (showBottomNavigation)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    if (_currentPage > 0)
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _previousPage,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: Text(isHindi ? 'पीछे' : 'Back'),
+                        ),
+                      ),
+                    if (_currentPage > 0) const SizedBox(width: 16),
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: _previousPage,
-                        style: OutlinedButton.styleFrom(
+                      flex: _currentPage > 0 ? 2 : 1,
+                      child: FilledButton(
+                        onPressed: _canProceed()
+                            ? (_currentPage == 4
+                                ? _completeOnboarding
+                                : _nextPage)
+                            : null,
+                        style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: Text(isHindi ? 'पीछे' : 'Back'),
+                        child: Text(
+                          _currentPage == 4
+                              ? (isHindi ? 'शुरू करें' : 'Get Started')
+                              : (isHindi ? 'आगे' : 'Continue'),
+                        ),
                       ),
                     ),
-                  if (_currentPage > 0) const SizedBox(width: 16),
-                  Expanded(
-                    flex: _currentPage > 0 ? 2 : 1,
-                    child: FilledButton(
-                      onPressed: _canProceed()
-                          ? (_currentPage == 4
-                              ? _completeOnboarding
-                              : _nextPage)
-                          : null,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: Text(
-                        _currentPage == 4
-                            ? (isHindi ? 'शुरू करें' : 'Get Started')
-                            : (isHindi ? 'आगे' : 'Continue'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                  ],
+                ),
+              )
+            else
+              const SizedBox(height: 24),
           ],
         ),
       ),
@@ -429,6 +437,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: _isVerifying ? null : _verifyOtp,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
                 child: _isVerifying
                     ? const SizedBox(
                         height: 20,
