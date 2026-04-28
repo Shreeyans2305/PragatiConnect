@@ -1,63 +1,139 @@
 # Pragati Connect
 
-> Unified AI assistant for India’s informal workforce, focused on practical access through mobile and voice-first interfaces.
+> **Unified Economic Assistant for India's Informal Workforce**
 
-Pragati Connect helps workers (artisans, daily wage workers, domestic workers, small service providers) with:
-- fair pricing support,
-- voice-based assistance,
-- government scheme discovery,
-- and business enablement tools.
-
-The actual product is the Mobile App and the Website on call interface. The demo website is just for helping users navigate to which one of the serivces they want to go to. Please go through the demo website to experience the services!!
-
-Try downloading the Andriod App since that is the easiest to setup, or just use the web calling website if you want to have a quick and seamless experience.
-
-Have fun!!
----
-
-## ✅ Current Product Status (What is Working Now)
-
-This repository currently ships **two active user-facing products**:
-
-1. **Mobile App (Flutter, iOS + Android)** — production-style feature set
-2. **On-Call Interface (Web prototype)** — browser-based voice call experience, designed as a toll-free-call prototype
+Pragati Connect bridges the gap between informal workers (artisans, maids, daily wage laborers) and the formal economy through fair price discovery, negotiation support, and government scheme access.
 
 ---
 
-## 📱 Mobile App (Flutter)
+## 🎯 The Problem
 
-Location: [MobileApp](MobileApp)
+India's 450+ million informal workers operate in an economic blind spot:
+- **Information Asymmetry:** No access to fair price discovery or wage benchmarks
+- **Exploitation:** Middlemen and clients leverage knowledge gaps to underpay
+- **Missed Opportunities:** Unaware of government welfare schemes worth ₹6,000-₹2,50,000 annually
+- **Confidence Gap:** Lack negotiation skills and practice for formal interactions
 
-### Implemented features
+**Impact:** Fair price discovery alone can increase artisan income by 15-30%.
 
-- **User onboarding + authentication** (OTP-backed API flow)
-- **Dashboard + profile management**
-- **AI Chat assistant**
-- **Voice Assistant**
-  - speech input
-  - AI response generation
-  - spoken response playback
-- **Government Schemes module**
-  - list/search/filter schemes
-  - scheme details view
-  - **official links open externally**
-- **Price Estimator**
-  - image upload
-  - AI-driven estimate response
-  - estimate history
-- **Business Boost tools**
-  - AI-generated business support content
-- **Multilingual experience** for major Indian languages
+---
 
-### Mobile tech stack
+## 💡 The Solution
 
-- Flutter + Dart
-- Provider for state management
-- Backend APIs (FastAPI)
-- AI via Amazon Bedrock (Nova/Claude model configuration)
-- Speech pipeline integrated via backend + device/client flow
+Pragati Connect provides three accessible interfaces powered by a unified AI backend:
 
-### Run mobile app locally
+### 1. 🎙️ Voice Negotiator (Phone Call) - **P0 Core Feature**
+- **Access:** Standard phone call to toll-free number
+- **Features:**
+  - Real-time wage queries in local language (Hindi, Tamil, Telugu, Bengali)
+  - Interactive negotiation practice with AI client simulation
+  - Confidence-building through realistic scenarios
+- **Technology:** Vapi.ai + Deepgram (STT) + ElevenLabs (TTS)
+- **Latency:** <2 seconds end-to-end response time
+
+### 2. 💬 Opportunity Alert (WhatsApp) - **P0 Core Feature**
+- **Access:** WhatsApp chatbot on user's existing number
+- **Features:**
+  - Proactive notifications about relevant government schemes
+  - Eligibility matching based on trade, location, and profile
+  - Conversational Q&A about scheme details and application process
+- **Rate Limiting:** Max 2 notifications per week to avoid spam
+
+### 3. 📱 Visual Price Estimator (Mobile App) - **P1 Future Enhancement**
+- **Access:** Mobile application (React Native/Flutter)
+- **Features:**
+  - Photo-based product analysis using multimodal AI
+  - Fair market price estimates with regional context
+  - Voice-guided explanations in local language
+  - Offline caching of recent estimates
+- **Technology:** Amazon Bedrock (Claude 3.5 Sonnet) for vision analysis
+
+---
+
+## 🏗️ Architecture
+
+### High-Level Design
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     User Interfaces                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ Phone Call   │  │  WhatsApp    │  │  Mobile App  │      │
+│  │  (Vapi.ai)   │  │   Chatbot    │  │   (Future)   │      │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
+└─────────┼──────────────────┼──────────────────┼─────────────┘
+          │                  │                  │
+          └──────────────────┼──────────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  AWS API Gateway │
+                    └────────┬────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+    ┌─────▼─────┐     ┌─────▼─────┐     ┌─────▼─────┐
+    │  Voice    │     │ WhatsApp  │     │  Profile  │
+    │  Handler  │     │  Handler  │     │  Manager  │
+    │  Lambda   │     │  Lambda   │     │  Lambda   │
+    └─────┬─────┘     └─────┬─────┘     └─────┬─────┘
+          │                  │                  │
+          └──────────────────┼──────────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  Central Brain   │
+                    │  (Orchestration) │
+                    └────────┬────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+    ┌─────▼─────┐     ┌─────▼─────┐     ┌─────▼─────┐
+    │  Bedrock  │     │ Knowledge │     │ DynamoDB  │
+    │   LLM     │     │   Base    │     │  Profiles │
+    │  (Claude) │     │   (RAG)   │     │  & Data   │
+    └───────────┘     └───────────┘     └───────────┘
+```
+
+### Technology Stack
+
+| Layer | Technology | Rationale |
+|-------|-----------|-----------|
+| **Backend** | Python + FastAPI | Rapid development, async support, AWS Lambda native |
+| **AI/LLM** | Amazon Bedrock (Claude 3.5 Sonnet) | Best reasoning, AWS-native, low latency from India |
+| **Knowledge Base** | Knowledge Bases for Bedrock (RAG) | Managed semantic search for government schemes |
+| **Voice** | Vapi.ai + Deepgram + ElevenLabs | Production-ready, <2s latency, multilingual |
+| **Database** | DynamoDB | Serverless, single-digit ms latency, auto-scaling |
+| **Storage** | S3 | Durable image storage with lifecycle policies |
+| **Compute** | AWS Lambda | Zero infrastructure, auto-scaling, pay-per-use |
+| **API** | AWS API Gateway | RESTful endpoints, validation, throttling |
+
+---
+
+## 👥 User Personas
+
+### Radha the Weaver (38, Tamil Nadu)
+- **Trade:** Handloom saree weaving
+- **Challenge:** Middlemen offer ₹800 for sarees worth ₹2,500
+- **Tech Access:** Feature phone (primary), occasional smartphone via family
+- **Usage:** Visual Price Estimator (via daughter's phone) + WhatsApp alerts for weaver schemes
+
+### Raju the Carpenter (45, Uttar Pradesh)
+- **Trade:** Furniture carpentry and home repairs
+- **Challenge:** Accepts low rates (₹400/day) due to negotiation uncertainty
+- **Tech Access:** Basic feature phone with voice capability
+- **Usage:** Voice Negotiator for wage queries and practice + WhatsApp for housing schemes
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.11+
+- AWS Account with Bedrock access
+- Vapi.ai account for voice integration
+- WhatsApp Business API access
+
+### Installation
 
 ```bash
 cd MobileApp
